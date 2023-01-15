@@ -90,7 +90,7 @@ void simple_ota_example_task(void *pvParameter)
     ESP_LOGI(TAG, "Bind interface name is %s", ifr.ifr_name);
 #endif
     esp_http_client_config_t config = {
-        .url = CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL,
+        .url = "https://esp32-fw-test1.s3-ap-southeast-2.amazonaws.com/ota_app7.bin",
 #ifdef CONFIG_EXAMPLE_USE_CERT_BUNDLE
         .crt_bundle_attach = esp_crt_bundle_attach,
 #else

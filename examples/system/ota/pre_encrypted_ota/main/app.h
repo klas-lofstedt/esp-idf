@@ -1,0 +1,47 @@
+/*
+ * app.h
+ *
+ *  Created on: 22 jan 2023
+ *      Author: klaslofstedt
+ */
+
+#ifndef _APP_H_
+#define _APP_H_
+
+#include "freertos/event_groups.h"
+
+// #define BLE_RECEIVE_EVENT BIT0
+// #define MQTT_RECEIVE_EVENT BIT1
+// #define WIFI_SCAN_DONE BIT2
+
+
+#define APP_EVENT_BLE_GAP_CONNECT BIT0
+#define APP_EVENT_BLE_GAP_ADV_COMPLETE BIT1
+#define APP_EVENT_BLE_GAP_DISCONNECT BIT2
+#define APP_EVENT_BLE_POP_DONE BIT3
+#define APP_EVENT_BLE_CREDS_DONE BIT4
+#define APP_EVENT_BLE_CERT_DONE BIT5
+#define APP_EVENT_BLE_NOTIFY_SCAN_DONE BIT6
+#define APP_EVENT_BLE_NOTIFY_STATUS_DONE BIT7
+#define APP_EVENT_WIFI_STA_START BIT8
+#define APP_EVENT_WIFI_STA_DISCONNECTED BIT9
+#define APP_EVENT_WIFI_STA_CONNECTED BIT10
+#define APP_EVENT_WIFI_SCAN_DONE BIT11
+
+// in app.c
+typedef enum {
+    APP_STATE_AWAITING_INIT = 0,
+    APP_STATE_AWAITING_BLE_CONNECTION = 1,
+    APP_STATE_AWAITING_BLE_POP = 2,
+    APP_STATE_AWAITING_SCAN_RESULTS = 3,
+    APP_STATE_AWAITING_BLE_CREDS = 4,
+    APP_STATE_AWAITING_BLE_CERT = 5,
+    APP_STATE_AWAITING_WIFI = 6,
+    APP_STATE_NORMAL_OPERATION = 7,
+} app_states_t;
+
+
+//extern EventGroupHandle_t app_events;
+extern EventGroupHandle_t app_event_group;
+
+#endif /* _APP_H_ */

@@ -16,6 +16,8 @@
 #include "app.h"
 #include <cJSON.h>
 #include "esp_wifi.h"
+#include "misc.h"
+#include "aes.h"
 
 
 #define SERVICE_UUID                0xFFFF
@@ -25,7 +27,7 @@
 #define CHAR_WRITE_CERT_UUID        0xFF03
 // Notify from esp32
 #define CHAR_NOTIFY_SCAN_UUID       0xFF04
-#define CHAR_NOTIFY_STATUS_UUID     0xFF05
+//#define CHAR_NOTIFY_STATUS_UUID     0xFF05
 // Read from esp32
 #define CHAR_READ_UUID              0xFF06
 
@@ -35,7 +37,8 @@ static const char *TAG = "BLE";
 
 uint8_t ble_addr_type;
 uint16_t control_notif_handle;
-char rx_data[WIFI_PWD_MAX_LEN];
+uint16_t conn_handle;
+char rx_data[255];
 
 static int ble_write_creds_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
 static int ble_device_read_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
@@ -43,14 +46,54 @@ static int ble_notify_dummy_cb(uint16_t conn_handle, uint16_t attr_handle, struc
 static int ble_event_handler(struct ble_gap_event *event, void *arg);
 //static int ble_device_notify(int16_t conn_handle, uint32_t data);
 
+void parse_and_print_json(char *json_input, char *ssid, char *password)
+{
+    cJSON *root = cJSON_Parse(json_input);
+    if (!root) {
+        ESP_LOGI(TAG, "Error parsing JSON input");
+        return;
+    }
+
+    char *type = cJSON_GetObjectItemCaseSensitive(root, "type")->valuestring;
+    char *ssid_temp = cJSON_GetObjectItemCaseSensitive(root, "ssid")->valuestring;
+    char *password_temp = cJSON_GetObjectItemCaseSensitive(root, "password")->valuestring;
+
+    // if (!cJSON_IsString(type) || !cJSON_IsString(ssid) || !cJSON_IsString(password)) {
+    //     printf("Error: JSON input has incorrect format.\n");
+    //     cJSON_Delete(root);
+    //     return;
+    // }
+
+    //printf("Received: %s, %s, %s\n", type, ssid, password);
+    ESP_LOGI(TAG, "Received: %s, %s, %s", type, ssid_temp, password_temp);
+    memcpy(ssid, ssid_temp, strlen(ssid_temp));
+    memcpy(password, password_temp, strlen(password_temp));
+
+    cJSON_Delete(root); // DONT move this before the print!!!
+}
 // Write data to ESP32 defined as server
 static int ble_write_pop_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
+    memset(rx_data, 0, sizeof(rx_data));
+
     //printf("Data from the client: %d, %d\n", ctxt->om->om_len, ctxt->om->om_data);
     memcpy(rx_data,ctxt->om->om_data,ctxt->om->om_len);
-    ESP_LOGI(TAG, "pop: %s", rx_data);
+    ESP_LOGI(TAG, "POP: %s, conn_handle %d", rx_data, conn_handle);
+    char pop_ble[BLE_POP_SIZE * 2];
+    memcpy(pop_ble, rx_data, BLE_POP_SIZE * 2);
+    //aes_ctr_crypto(rx_data, pop);
+    //ESP_LOGI(TAG, "Unencrypted POP: %s", pop);
+    char pop_nvs[32];
+    nvs_get_ble_pop_str(pop_nvs);
+    ESP_LOGI(TAG, "NVS POP: %s", pop_nvs);
+    if (strncmp(pop_nvs, pop_ble, BLE_POP_SIZE * 2) == 0){
+        ESP_LOGI(TAG, "POP are equal");
+    } else {
+        ESP_LOGI(TAG, "POP error");
+    }
+
     //printf("Receive Data =  %.*s, conn_handle = %d\n", WIFI_PWD_MAX_LEN, rx_data, conn_handle);
-    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_POP_DONE);
+    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_POP_DONE);
 
     //ble_device_notify(0, "hej");
 
@@ -66,12 +109,44 @@ static int ble_write_pop_cb(uint16_t conn_handle, uint16_t attr_handle, struct b
 
 static int ble_write_creds_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
-    //printf("Data from the client: %d, %d\n", ctxt->om->om_len, ctxt->om->om_data);
+    memset(rx_data, 0, sizeof(rx_data));
     memcpy(rx_data,ctxt->om->om_data,ctxt->om->om_len);
-    ESP_LOGI(TAG, "creds: %s", rx_data);
 
-    //printf("Receive Data =  %.*s, conn_handle = %d\n", WIFI_PWD_MAX_LEN, rx_data, conn_handle);
-    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_CREDS_DONE);
+    char output_test[ctxt->om->om_len / 2];
+    u8_array_from_hex_string(rx_data, output_test, ctxt->om->om_len / 2);
+    //nvs_get_aes_key_str(aes_key);
+    ESP_LOGI(TAG, "encrypted: ");
+
+    ESP_LOG_BUFFER_HEX(TAG, output_test, sizeof(output_test));
+    unsigned char decrypted[ctxt->om->om_len / 2];
+    aes_ctr_crypto(output_test, decrypted);
+    ESP_LOGI(TAG, "decrypted: ");
+    ESP_LOG_BUFFER_HEX(TAG, decrypted, sizeof(decrypted));
+
+    char decrypted_string[ctxt->om->om_len / 2 ];
+    ascii_string_from_u8_array(decrypted, decrypted_string, ctxt->om->om_len / 2);
+    ESP_LOGI(TAG, "%s", decrypted_string);
+
+    char ssid[WIFI_SSID_MAX_LEN];
+    char password[WIFI_PWD_MAX_LEN];
+    memset(ssid, 0, sizeof(ssid));
+    memset(password, 0, sizeof(password));
+
+
+
+    parse_and_print_json(decrypted_string, ssid, password);
+    ESP_LOGI(TAG, "Received in BLE: %s, %s", ssid, password);
+
+    ESP_LOGI(TAG, "SSID: ");
+    ESP_LOG_BUFFER_HEX(TAG, ssid, strlen(ssid));
+    ESP_LOGI(TAG, "PropellerAero: ");
+    ESP_LOG_BUFFER_HEX(TAG, "PropellerAero", strlen("PropellerAero"));
+    ESP_LOGI(TAG, "PWD: ");
+    ESP_LOG_BUFFER_HEX(TAG, password, strlen(password));
+    ESP_LOGI(TAG, "hejklas1234: ");
+    ESP_LOG_BUFFER_HEX(TAG, "hejklas1234", strlen("hejklas1234"));
+
+    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE);
 
     //ble_device_notify(0, "hej");
 
@@ -85,6 +160,7 @@ static int ble_write_creds_cb(uint16_t conn_handle, uint16_t attr_handle, struct
     return 0;
 }
 
+
 static int ble_write_cert_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     //printf("Data from the client: %d, %d\n", ctxt->om->om_len, ctxt->om->om_data);
@@ -92,7 +168,7 @@ static int ble_write_cert_cb(uint16_t conn_handle, uint16_t attr_handle, struct 
     ESP_LOGI(TAG, "cert: %s", rx_data);
 
     //printf("Receive Data =  %.*s, conn_handle = %d\n", WIFI_PWD_MAX_LEN, rx_data, conn_handle);
-    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_CERT_DONE);
+    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_CA_CERT_DONE);
 
     //ble_device_notify(0, "hej");
 
@@ -146,13 +222,13 @@ static int ble_device_read_cb(uint16_t conn_handle, uint16_t attr_handle, struct
     return 0;
 }
 
-int ble_notify_scan(int16_t conn_handle)//, char* ble_data)
+bool ble_notify_wifi_scan(void)
 {
     uint16_t apCount = WIFI_MAX_SCAN_RESULTS;
-    esp_wifi_scan_get_ap_num(&apCount);
     wifi_ap_record_t ap_list[WIFI_MAX_SCAN_RESULTS];
 
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&apCount, ap_list));
+
     for (int i = 0; i < apCount; i++){
         ESP_LOGI(TAG, "SSID: %s, RSSI: %d", ap_list[i].ssid, ap_list[i].rssi);
     }
@@ -160,39 +236,98 @@ int ble_notify_scan(int16_t conn_handle)//, char* ble_data)
     esp_wifi_scan_stop();
 
     for(int i = 0; i < apCount; i++) {
-
         char *json_str = NULL;
-
         cJSON *message_root = cJSON_CreateObject();
-        //cJSON *data_array = cJSON_CreateArray();
 
         cJSON_AddStringToObject(message_root, "type", "wifi_scan");
         cJSON_AddStringToObject(message_root, "ssid", (char *)ap_list[i].ssid);
         cJSON_AddNumberToObject(message_root, "rssi", ap_list[i].rssi);
         cJSON_AddNumberToObject(message_root, "count", apCount - i - 1);
 
-
         json_str = cJSON_Print(message_root);
         cJSON_Delete(message_root);
 
-
         struct os_mbuf *om;
-        if(conn_handle > -1){
-            //om = ble_hs_mbuf_from_flat(&rx_data, sizeof(rx_data));
-
-            om = ble_hs_mbuf_from_flat(json_str, strlen(json_str));
-            ESP_LOGI(TAG, "Notifying conn=%d", conn_handle);
-            int rc = ble_gattc_notify_custom((uint16_t)conn_handle, control_notif_handle, om);
-            if (rc != 0) {
-                ESP_LOGE(TAG, "error notifying; rc=%d", rc);
-                return 0;
-            }
+        om = ble_hs_mbuf_from_flat(json_str, strlen(json_str));
+        // TODO: come up with a better way to handle conn_handle
+        conn_handle = 0;
+        ESP_LOGI(TAG, "Notifying conn=%d", conn_handle);
+        int rc = ble_gatts_notify_custom(conn_handle, control_notif_handle, om);
+        if (rc != 0) {
+            ESP_LOGE(TAG, "error notifying; rc=%d", rc);
+            return false;
         }
         cJSON_free(json_str);
     }
-    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_NOTIFY_SCAN_DONE);
+    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE);
 
-    return 0;
+    return true;
+}
+
+bool ble_notify_wifi_creds(bool status)
+{
+    char *json_str = NULL;
+    cJSON *message_root = cJSON_CreateObject();
+
+    cJSON_AddStringToObject(message_root, "type", "wifi_creds");
+    if (status){
+        cJSON_AddStringToObject(message_root, "status", "ok");
+    } else {
+        cJSON_AddStringToObject(message_root, "status", "error");
+    }
+    cJSON_AddNumberToObject(message_root, "count", 0);
+
+    json_str = cJSON_Print(message_root);
+    cJSON_Delete(message_root);
+
+    struct os_mbuf *om;
+    om = ble_hs_mbuf_from_flat(json_str, strlen(json_str));
+    // TODO: come up with a better way to handle conn_handle
+    conn_handle = 0;
+    ESP_LOGI(TAG, "Notifying conn=%d", conn_handle);
+    int rc = ble_gatts_notify_custom(conn_handle, control_notif_handle, om);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "error notifying; rc=%d", rc);
+        return false;
+    }
+    cJSON_free(json_str);
+
+    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE);
+
+    return true;
+}
+
+bool ble_notify_ca_cert(bool status)
+{
+    char *json_str = NULL;
+    cJSON *message_root = cJSON_CreateObject();
+
+    cJSON_AddStringToObject(message_root, "type", "wifi_cert");
+    if (status){
+        cJSON_AddStringToObject(message_root, "status", "ok");
+    } else {
+        cJSON_AddStringToObject(message_root, "status", "error");
+    }
+    cJSON_AddNumberToObject(message_root, "count", 0);
+
+    json_str = cJSON_Print(message_root);
+    cJSON_Delete(message_root);
+
+    struct os_mbuf *om;
+    om = ble_hs_mbuf_from_flat(json_str, strlen(json_str));
+    // TODO: come up with a better way to handle conn_handle
+    conn_handle = 0;
+    ESP_LOGI(TAG, "Notifying conn=%d", conn_handle);
+    int rc = ble_gatts_notify_custom(conn_handle, control_notif_handle, om);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "error notifying; rc=%d", rc);
+        return false;
+    }
+    cJSON_free(json_str);
+
+    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_NOTIFY_CA_CERT_DONE);
+
+    return true;
 }
 
 static int ble_notify_dummy_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
@@ -230,12 +365,12 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {
                 .val_handle = &control_notif_handle,
                 .flags = BLE_GATT_CHR_F_NOTIFY
             },
-            {
-                .uuid = BLE_UUID16_DECLARE(CHAR_NOTIFY_STATUS_UUID),
-                .access_cb = ble_notify_dummy_cb,
-                .val_handle = &control_notif_handle,
-                .flags = BLE_GATT_CHR_F_NOTIFY
-            },
+            // {
+            //     .uuid = BLE_UUID16_DECLARE(CHAR_NOTIFY_STATUS_UUID),
+            //     .access_cb = ble_notify_dummy_cb,
+            //     .val_handle = &control_notif_handle,
+            //     .flags = BLE_GATT_CHR_F_NOTIFY
+            // },
             {
                 .uuid = BLE_UUID16_DECLARE(CHAR_READ_UUID),           // Define UUID for reading
                 .flags = BLE_GATT_CHR_F_READ,
@@ -251,6 +386,8 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {
 static int ble_event_handler(struct ble_gap_event *event, void *arg)
 {
     ESP_LOGI(TAG, "BLE EVENT: %d", event->type);
+    //ESP_LOGI(TAG, "conn_handle: %d", event->connect.conn_handle);
+    conn_handle = event->connect.conn_handle;
 
     switch (event->type)
     {
@@ -276,6 +413,11 @@ static int ble_event_handler(struct ble_gap_event *event, void *arg)
         ESP_LOGI(TAG, "BLE GAP EVENT DISCONNECT");
         ble_start();
         xEventGroupSetBits(app_event_group, APP_EVENT_BLE_GAP_DISCONNECT);
+        break;
+    case BLE_GAP_EVENT_NOTIFY_TX:
+        ESP_LOGI(TAG, "BLE_GAP_EVENT_NOTIFY_TX");
+
+        break;
     default:
         break;
     }
@@ -291,6 +433,8 @@ void ble_start(void)
     const char *device_name;
     memset(&fields, 0, sizeof(fields));
     device_name = ble_svc_gap_device_name(); // Read the BLE device name
+    ESP_LOGI(TAG, "Device name: %s", device_name);
+
     fields.name = (uint8_t *)device_name;
     fields.name_len = strlen(device_name);
     fields.name_is_complete = 1;
@@ -319,8 +463,11 @@ void ble_host_task(void *param)
 
 void ble_init(void)
 {
+    char device_name[DEVICE_ID_LEN];
+    get_device_id(device_name);
+
     nimble_port_init();                        // 3 - Initialize the host stack
-    ble_svc_gap_device_name_set("BLE-Server"); // 4 - Initialize NimBLE configuration - server name
+    ble_svc_gap_device_name_set(device_name); // 4 - Initialize NimBLE configuration - server name
     ble_svc_gap_init();                        // 4 - Initialize NimBLE configuration - gap service
     ble_svc_gatt_init();                       // 4 - Initialize NimBLE configuration - gatt service
     ble_gatts_count_cfg(gatt_svcs);            // 4 - Initialize NimBLE configuration - config gatt services

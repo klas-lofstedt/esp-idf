@@ -8,17 +8,122 @@
 #include "esp_log.h"
 #include <string.h>
 #include "wifi.h"
+#include "misc.h"
+#include "aes.h"
+#include "ble.h"
 
 // NVS storage
 #define WIFI_IS_PROVISIONED     1
 #define WIFI_NOT_PROVISIONED    0
+
 #define NVS_APP_NAMESPACE       "storage"
+
 #define NVS_WIFI_SSID_KEY       "wifi_ssid"
 #define NVS_WIFI_PWD_KEY        "wifi_pwd"
 #define NVS_WIFI_PROVISION_KEY  "wifi_is_prov"
+#define NVS_BLE_POP_KEY         "ble_pop"
+#define NVS_AES_KEY             "aes_key"
 
 static const char *TAG = "NVS";
 
+void nvs_set_ble_pop(void)
+{
+    uint8_t pop[BLE_POP_SIZE];
+    generate_random_u8_array(pop, BLE_POP_SIZE);
+    ESP_LOGI(TAG, "Set BLE pop in NVS");
+    ESP_LOG_BUFFER_HEX(TAG, pop, 16);
+
+    // Create nvs handle
+    nvs_handle_t handle_ble_pop;
+    // Open nvs
+    ESP_ERROR_CHECK(nvs_open(NVS_APP_NAMESPACE, NVS_READWRITE, &handle_ble_pop));
+    // Create data to store
+    size_t len = BLE_POP_SIZE;
+    ESP_ERROR_CHECK(nvs_set_blob(handle_ble_pop, NVS_BLE_POP_KEY, pop, len));
+    // Commit data to nvs
+    ESP_ERROR_CHECK(nvs_commit(handle_ble_pop));
+    // Close
+    nvs_close(handle_ble_pop);
+}
+
+void nvs_get_ble_pop_arr(uint8_t *pop)
+{
+    ESP_LOGI(TAG, "Get BLE pop in NVS");
+    // Create nvs handle
+    nvs_handle_t handle_ble_pop;
+    // Open nvs
+    ESP_ERROR_CHECK(nvs_open(NVS_APP_NAMESPACE, NVS_READWRITE, &handle_ble_pop));
+    // Create data to store
+    size_t len = BLE_POP_SIZE;
+    ESP_ERROR_CHECK(nvs_get_blob(handle_ble_pop, NVS_BLE_POP_KEY, pop, &len));
+    // Close
+    nvs_close(handle_ble_pop);
+}
+
+void nvs_get_ble_pop_str(char *pop)
+{
+    ESP_LOGI(TAG, "Get BLE pop in NVS");
+    uint8_t temp[BLE_POP_SIZE];
+    // Create nvs handle
+    nvs_handle_t handle_ble_pop;
+    // Open nvs
+    ESP_ERROR_CHECK(nvs_open(NVS_APP_NAMESPACE, NVS_READWRITE, &handle_ble_pop));
+    // Create data to store
+    size_t len = BLE_POP_SIZE;
+    ESP_ERROR_CHECK(nvs_get_blob(handle_ble_pop, NVS_BLE_POP_KEY, temp, &len));
+    hex_string_from_u8_array(temp, pop, BLE_POP_SIZE);
+    // Close
+    nvs_close(handle_ble_pop);
+}
+
+void nvs_set_aes_key(void)
+{
+    uint8_t aes[AES_KEY_SIZE];
+    generate_random_u8_array(aes, AES_KEY_SIZE);
+    ESP_LOGI(TAG, "Set AES key in NVS");
+    ESP_LOG_BUFFER_HEX(TAG, aes, 16);
+    // Create nvs handle
+    nvs_handle_t handle_aes_key;
+    // Open nvs
+    ESP_ERROR_CHECK(nvs_open(NVS_APP_NAMESPACE, NVS_READWRITE, &handle_aes_key));
+    // Create data to store
+    size_t len = AES_KEY_SIZE;
+    ESP_ERROR_CHECK(nvs_set_blob(handle_aes_key, NVS_AES_KEY, aes, len));
+    // Commit data to nvs
+    ESP_ERROR_CHECK(nvs_commit(handle_aes_key));
+    // Close
+    nvs_close(handle_aes_key);
+}
+
+void nvs_get_aes_key_arr(uint8_t *aes)
+{
+    ESP_LOGI(TAG, "Get AES key in NVS");
+    // Create nvs handle
+    nvs_handle_t handle_aes_key;
+    // Open nvs
+    ESP_ERROR_CHECK(nvs_open(NVS_APP_NAMESPACE, NVS_READWRITE, &handle_aes_key));
+    // Create data to store
+    size_t len = AES_KEY_SIZE;
+    ESP_ERROR_CHECK(nvs_get_blob(handle_aes_key, NVS_AES_KEY, aes, &len));
+    // Close
+    nvs_close(handle_aes_key);
+}
+
+void nvs_get_aes_key_str(char *aes)
+{
+    ESP_LOGI(TAG, "Get AES key in NVS");
+    uint8_t temp[AES_KEY_SIZE];
+    // Create nvs handle
+    nvs_handle_t handle_aes_key;
+    // Open nvs
+    ESP_ERROR_CHECK(nvs_open(NVS_APP_NAMESPACE, NVS_READWRITE, &handle_aes_key));
+    // Create data to store
+    size_t len = AES_KEY_SIZE;
+    ESP_ERROR_CHECK(nvs_get_blob(handle_aes_key, NVS_AES_KEY, temp, &len));
+    hex_string_from_u8_array(temp, aes, AES_KEY_SIZE);
+    // Close
+    nvs_close(handle_aes_key);
+}
 
 bool nvs_wifi_is_provisioned(void)
 {

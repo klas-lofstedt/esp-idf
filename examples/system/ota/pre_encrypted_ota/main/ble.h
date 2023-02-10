@@ -8,16 +8,15 @@
 #ifndef _BLE_H_
 #define _BLE_H_
 
-typedef enum
-{
-    WAITING_CONNECTION = 0,
-    WAITING_POP = 1,
-    WAITING_CRED = 2,
-    WAITING_CERT = 3,
-} ble_status_t;
+#define BLE_POP_SIZE            16
 
 void ble_init(void);
 void ble_start(void);
-int ble_notify_scan(int16_t conn_handle);//, char* ble_data);
+bool ble_notify_wifi_scan(void);
+bool ble_notify_wifi_creds(bool status);
+bool ble_notify_ca_cert(bool status);
+void parse_ble_json_message(char *ble_message);
+
+
 
 #endif /* _BLE_H_ */

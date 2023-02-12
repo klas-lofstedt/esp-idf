@@ -17,6 +17,7 @@ char* wifi_get_scan(void);
 void wifi_start_scan(void);
 //void wifi_connect_to_network(void);
 void wifi_init(void);
+void wifi_reinit(void);
 void wifi_connect(void);
 void wifi_connect_propeller(void);
 

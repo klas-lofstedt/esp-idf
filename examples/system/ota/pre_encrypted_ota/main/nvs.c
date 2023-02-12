@@ -147,7 +147,7 @@ bool nvs_wifi_is_provisioned(void)
 
 bool nvs_wifi_set_pwd(const char* str)
 {
-    ESP_LOGI(TAG, "NVS wifi pwd input: %s", str);
+    ESP_LOGI(TAG, "NVS wifi set pwd input: %s", str);
 
     // Create nvs handle
     nvs_handle_t handle_wifi;
@@ -163,24 +163,91 @@ bool nvs_wifi_set_pwd(const char* str)
     size_t buf_len = sizeof(buf);
     ESP_ERROR_CHECK(nvs_get_str(handle_wifi, NVS_WIFI_PWD_KEY, buf, &buf_len));
 
-    ESP_LOGI(TAG, "NVS wifi pwd read: %s", buf);
+    ESP_LOGI(TAG, "NVS wifi set pwd read: %s", buf);
 
-    if (!strcmp(str, buf)){
-        ESP_ERROR_CHECK(nvs_set_i32(handle_wifi, NVS_WIFI_PROVISION_KEY, WIFI_IS_PROVISIONED));
-        // Commit data to nvs
-        ESP_ERROR_CHECK(nvs_commit(handle_wifi));
-        // Read nvs back
-        int32_t is_provisioned = -1;
-        ESP_ERROR_CHECK(nvs_get_i32(handle_wifi, NVS_WIFI_PROVISION_KEY, &is_provisioned));
-
-        // Close
-        nvs_close(handle_wifi);
-        return is_provisioned;
-    }
-
-    // Close
     nvs_close(handle_wifi);
+
+    if (strcmp(str, buf) == 0){
+        ESP_LOGI(TAG, "NVS wifi password OK");
+        return true;
+    }
+    ESP_LOGI(TAG, "NVS wifi password failed");
     return false;
+}
+
+bool nvs_wifi_set_provisioned(bool set_provision)
+{
+    ESP_LOGI(TAG, "NVS wifi provisioned input: %d", set_provision);
+
+    // Create nvs handle
+    nvs_handle_t handle_wifi;
+    // Open nvs
+    ESP_ERROR_CHECK(nvs_open(NVS_APP_NAMESPACE, NVS_READWRITE, &handle_wifi));
+    // Create data to store
+    //const char* str = "hejhej test klas";
+    ESP_ERROR_CHECK(nvs_set_i32(handle_wifi, NVS_WIFI_PROVISION_KEY, (int32_t)set_provision));
+    // Commit data to nvs
+    ESP_ERROR_CHECK(nvs_commit(handle_wifi));
+    // Read nvs back into char buffer
+    int32_t is_provisioned = -1;
+    ESP_ERROR_CHECK(nvs_get_i32(handle_wifi, NVS_WIFI_PROVISION_KEY, &is_provisioned));
+
+    nvs_close(handle_wifi);
+
+    if ((int32_t)set_provision == is_provisioned){
+        ESP_LOGI(TAG, "NVS wifi provision OK");
+        return true;
+    }
+    ESP_LOGI(TAG, "NVS wifi provision failed");
+    return false;
+}
+
+bool nvs_wifi_set_ssid(const char* str)
+{
+    ESP_LOGI(TAG, "NVS wifi ssid input: %s", str);
+
+    // Create nvs handle
+    nvs_handle_t handle_wifi;
+    // Open nvs
+    ESP_ERROR_CHECK(nvs_open(NVS_APP_NAMESPACE, NVS_READWRITE, &handle_wifi));
+    // Create data to store
+    //const char* str = "hejhej test klas";
+    ESP_ERROR_CHECK(nvs_set_str(handle_wifi, NVS_WIFI_SSID_KEY, str));
+    // Commit data to nvs
+    ESP_ERROR_CHECK(nvs_commit(handle_wifi));
+    // Read nvs back into char buffer
+    char buf[WIFI_SSID_MAX_LEN + 1];
+    size_t buf_len = sizeof(buf);
+    ESP_ERROR_CHECK(nvs_get_str(handle_wifi, NVS_WIFI_SSID_KEY, buf, &buf_len));
+
+    ESP_LOGI(TAG, "NVS wifi ssid read: %s", buf);
+
+    nvs_close(handle_wifi);
+
+    if (strcmp(str, buf) == 0){
+        ESP_LOGI(TAG, "NVS wifi ssid OK");
+        return true;
+    }
+    ESP_LOGI(TAG, "NVS wifi ssid failed");
+    return false;
+}
+
+bool nvs_wifi_get_ssid(uint8_t *buffer)
+{
+    // Create nvs handle
+    nvs_handle_t handle_wifi;
+    // Open nvs
+    ESP_ERROR_CHECK(nvs_open(NVS_APP_NAMESPACE, NVS_READWRITE, &handle_wifi));
+    // Read nvs back into char buffer
+    char char_buffer[WIFI_SSID_MAX_LEN];
+    size_t char_buffer_len = sizeof(char_buffer);
+    ESP_ERROR_CHECK(nvs_get_str(handle_wifi, NVS_WIFI_SSID_KEY, char_buffer, &char_buffer_len));
+
+    memcpy(buffer, char_buffer, WIFI_SSID_MAX_LEN);
+    ESP_LOGI(TAG, "NVS wifi ssid read: %s", buffer);
+
+    nvs_close(handle_wifi);
+    return true;// TODO
 }
 
 bool nvs_wifi_get_pwd(uint8_t *buffer)
@@ -195,7 +262,7 @@ bool nvs_wifi_get_pwd(uint8_t *buffer)
     ESP_ERROR_CHECK(nvs_get_str(handle_wifi, NVS_WIFI_PWD_KEY, char_buffer, &char_buffer_len));
 
     memcpy(buffer, char_buffer, WIFI_PWD_MAX_LEN);
-    ESP_LOGI(TAG, "NVS wifi pwd read: %s", buffer);
+    ESP_LOGI(TAG, "NVS wifi get pwd read: %s", buffer);
 
     nvs_close(handle_wifi);
     return true;// TODO

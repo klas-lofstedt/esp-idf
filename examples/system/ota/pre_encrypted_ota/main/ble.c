@@ -40,36 +40,64 @@ uint16_t control_notif_handle;
 uint16_t conn_handle;
 char rx_data[255];
 
+static bool handle_json_string(char *json_input);
 static int ble_write_creds_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
 static int ble_device_read_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
 static int ble_notify_dummy_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
 static int ble_event_handler(struct ble_gap_event *event, void *arg);
 //static int ble_device_notify(int16_t conn_handle, uint32_t data);
 
-void parse_and_print_json(char *json_input, char *ssid, char *password)
+bool handle_json_string(char *json_input)//, char *ssid, char *password)
 {
     cJSON *root = cJSON_Parse(json_input);
     if (!root) {
         ESP_LOGI(TAG, "Error parsing JSON input");
-        return;
+        return false;
     }
 
-    char *type = cJSON_GetObjectItemCaseSensitive(root, "type")->valuestring;
-    char *ssid_temp = cJSON_GetObjectItemCaseSensitive(root, "ssid")->valuestring;
-    char *password_temp = cJSON_GetObjectItemCaseSensitive(root, "password")->valuestring;
+    cJSON *type = cJSON_GetObjectItemCaseSensitive(root, "type");
 
-    // if (!cJSON_IsString(type) || !cJSON_IsString(ssid) || !cJSON_IsString(password)) {
-    //     printf("Error: JSON input has incorrect format.\n");
-    //     cJSON_Delete(root);
-    //     return;
-    // }
+    if (!cJSON_IsString(type)) {
+        ESP_LOGI(TAG, "Error: JSON type is not a string");
+        cJSON_Delete(root);
+        return false;
+    }
+
+    if (strcmp(type->valuestring, "creds") == 0){
+        char *ssid = cJSON_GetObjectItemCaseSensitive(root, "ssid")->valuestring;
+        char *password = cJSON_GetObjectItemCaseSensitive(root, "password")->valuestring;
+        if (!nvs_wifi_set_ssid(ssid)){
+            cJSON_Delete(root);
+            return false;
+        }
+        if (!nvs_wifi_set_pwd(password)){
+            cJSON_Delete(root);
+            return false;
+        }
+        if (!nvs_wifi_set_provisioned(true)){
+            cJSON_Delete(root);
+            return false;
+        }
+        // char ssid[WIFI_SSID_MAX_LEN];
+        // char password[WIFI_PWD_MAX_LEN];
+        // memset(ssid, 0, sizeof(ssid));
+        // memset(password, 0, sizeof(password));
+        // memcpy(ssid, ssid_temp, strlen(ssid_temp));
+        // memcpy(password, password_temp, strlen(password_temp));
+    } else if (strcmp(type->valuestring, "cert") == 0){
+        //char *cert = cJSON_GetObjectItemCaseSensitive(root, "line")->valuestring;
+        //int *count = cJSON_GetObjectItemCaseSensitive(root, "count")->valueint;
+    } else {
+        ESP_LOGI(TAG, "Error: JSON has unknown subtype ");
+        cJSON_Delete(root);
+        return false;
+    }
 
     //printf("Received: %s, %s, %s\n", type, ssid, password);
-    ESP_LOGI(TAG, "Received: %s, %s, %s", type, ssid_temp, password_temp);
-    memcpy(ssid, ssid_temp, strlen(ssid_temp));
-    memcpy(password, password_temp, strlen(password_temp));
+    //ESP_LOGI(TAG, "Received: %s, %s, %s", type, ssid_temp, password_temp);
 
     cJSON_Delete(root); // DONT move this before the print!!!
+    return true;
 }
 // Write data to ESP32 defined as server
 static int ble_write_pop_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
@@ -112,41 +140,32 @@ static int ble_write_creds_cb(uint16_t conn_handle, uint16_t attr_handle, struct
     memset(rx_data, 0, sizeof(rx_data));
     memcpy(rx_data,ctxt->om->om_data,ctxt->om->om_len);
 
-    char output_test[ctxt->om->om_len / 2];
-    u8_array_from_hex_string(rx_data, output_test, ctxt->om->om_len / 2);
-    //nvs_get_aes_key_str(aes_key);
-    ESP_LOGI(TAG, "encrypted: ");
+    char decrypted_string[ctxt->om->om_len / 2];
+    aes_ctr_crypto(rx_data, decrypted_string, ctxt->om->om_len / 2 );
 
-    ESP_LOG_BUFFER_HEX(TAG, output_test, sizeof(output_test));
-    unsigned char decrypted[ctxt->om->om_len / 2];
-    aes_ctr_crypto(output_test, decrypted);
-    ESP_LOGI(TAG, "decrypted: ");
-    ESP_LOG_BUFFER_HEX(TAG, decrypted, sizeof(decrypted));
+    // char ssid[WIFI_SSID_MAX_LEN];
+    // char password[WIFI_PWD_MAX_LEN];
+    // memset(ssid, 0, sizeof(ssid));
+    // memset(password, 0, sizeof(password));
 
-    char decrypted_string[ctxt->om->om_len / 2 ];
-    ascii_string_from_u8_array(decrypted, decrypted_string, ctxt->om->om_len / 2);
-    ESP_LOGI(TAG, "%s", decrypted_string);
+    if (handle_json_string(decrypted_string)) {
+        xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE);
+    } else {
+        xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE);
+    }
+    // ESP_LOGI(TAG, "Received in BLE: %s, %s", ssid, password);
 
-    char ssid[WIFI_SSID_MAX_LEN];
-    char password[WIFI_PWD_MAX_LEN];
-    memset(ssid, 0, sizeof(ssid));
-    memset(password, 0, sizeof(password));
+    // ESP_LOGI(TAG, "SSID: ");
+    // ESP_LOG_BUFFER_HEX(TAG, ssid, strlen(ssid));
+    // ESP_LOGI(TAG, "PropellerAero: ");
+    // ESP_LOG_BUFFER_HEX(TAG, "PropellerAero", strlen("PropellerAero"));
+    // ESP_LOGI(TAG, "PWD: ");
+    // ESP_LOG_BUFFER_HEX(TAG, password, strlen(password));
+    // ESP_LOGI(TAG, "hejklas1234: ");
+    // ESP_LOG_BUFFER_HEX(TAG, "hejklas1234", strlen("hejklas1234"));
 
 
 
-    parse_and_print_json(decrypted_string, ssid, password);
-    ESP_LOGI(TAG, "Received in BLE: %s, %s", ssid, password);
-
-    ESP_LOGI(TAG, "SSID: ");
-    ESP_LOG_BUFFER_HEX(TAG, ssid, strlen(ssid));
-    ESP_LOGI(TAG, "PropellerAero: ");
-    ESP_LOG_BUFFER_HEX(TAG, "PropellerAero", strlen("PropellerAero"));
-    ESP_LOGI(TAG, "PWD: ");
-    ESP_LOG_BUFFER_HEX(TAG, password, strlen(password));
-    ESP_LOGI(TAG, "hejklas1234: ");
-    ESP_LOG_BUFFER_HEX(TAG, "hejklas1234", strlen("hejklas1234"));
-
-    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE);
 
     //ble_device_notify(0, "hej");
 

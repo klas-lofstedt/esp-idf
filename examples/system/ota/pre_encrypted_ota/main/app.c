@@ -2,7 +2,6 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "esp_log.h"
-
 //#include <cJSON.h>
 
 #include "ota.h"
@@ -21,11 +20,14 @@ static const char *TAG = "APP";
 
 EventGroupHandle_t app_event_group;
 
-static uint32_t awaiting_event(void);
+static uint32_t app_awaiting_event(void);
+static const char* app_event_string(app_event_t event);
+static const char* app_state_string(app_states_t state);
+
 static void set_production_keys(void);
 static void set_provisioning_keys(void);
 
-static uint32_t awaiting_event(void)
+static uint32_t app_awaiting_event(void)
 {
     EventBits_t bits = xEventGroupWaitBits(app_event_group,
         APP_EVENT_BLE_GAP_CONNECT |
@@ -48,6 +50,44 @@ static uint32_t awaiting_event(void)
     uint32_t event = (uint32_t)bits;
 
     return event;
+}
+
+static const char* app_event_string(app_event_t event)
+{
+    switch (event) {
+        case APP_EVENT_BLE_GAP_CONNECT: return "APP_EVENT_BLE_GAP_CONNECT";
+        case APP_EVENT_BLE_GAP_ADV_COMPLETE: return "APP_EVENT_BLE_GAP_ADV_COMPLETE";
+        case APP_EVENT_BLE_GAP_DISCONNECT: return "APP_EVENT_BLE_GAP_DISCONNECT";
+        case APP_EVENT_BLE_RECEIVE_POP_DONE: return "APP_EVENT_BLE_RECEIVE_POP_DONE";
+        case APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE: return "APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE";
+        case APP_EVENT_BLE_RECEIVE_CA_CERT_DONE: return "APP_EVENT_BLE_RECEIVE_CA_CERT_DONE";
+        case APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE: return "APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE";
+        case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE: return "APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE";
+        case APP_EVENT_BLE_NOTIFY_CA_CERT_DONE: return "APP_EVENT_BLE_NOTIFY_CA_CERT_DONE";
+        case APP_EVENT_WIFI_START: return "APP_EVENT_WIFI_START";
+        case APP_EVENT_WIFI_DISCONNECTED: return "APP_EVENT_WIFI_DISCONNECTED";
+        case APP_EVENT_WIFI_CONNECTED: return "APP_EVENT_WIFI_CONNECTED";
+        case APP_EVENT_WIFI_SCAN_DONE: return "APP_EVENT_WIFI_SCAN_DONE";
+        default: return "UNKNOWN_APP_EVENT";
+    }
+}
+
+static const char* app_state_string(app_states_t state)
+{
+    switch (state) {
+        case APP_STATE_AWAITING_INIT: return "APP_STATE_AWAITING_INIT";
+        case APP_STATE_AWAITING_BLE_CONNECTION: return "APP_STATE_AWAITING_BLE_CONNECTION";
+        case APP_STATE_AWAITING_BLE_RECEIVE_POP: return "APP_STATE_AWAITING_BLE_RECEIVE_POP";
+        case APP_STATE_AWAITING_WIFI_SCAN_DONE: return "APP_STATE_AWAITING_WIFI_SCAN_DONE";
+        case APP_STATE_AWAITING_BLE_NOTIFY_WIFI_SCAN_DONE: return "APP_STATE_AWAITING_BLE_NOTIFY_WIFI_SCAN_DONE";
+        case APP_STATE_AWAITING_BLE_RECEIVE_WIFI_CREDS: return "APP_STATE_AWAITING_BLE_RECEIVE_WIFI_CREDS";
+        case APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE: return "APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE";
+        case APP_STATE_AWAITING_BLE_RECEIVE_CA_CERT: return "APP_STATE_AWAITING_BLE_RECEIVE_CA_CERT";
+        case APP_STATE_AWAITING_BLE_NOTIFY_CA_CERT_DONE: return "APP_STATE_AWAITING_BLE_NOTIFY_CA_CERT_DONE";
+        case APP_STATE_AWAITING_WIFI_CONNECTED: return "APP_STATE_AWAITING_WIFI_CONNECTED";
+        case APP_STATE_NORMAL_OPERATION: return "APP_STATE_NORMAL_OPERATION";
+        default: return "UNKNOWN_APP_STATE";
+    }
 }
 
 // TODO: these should be sent to the RPi jig. To prevent that -someone- reads them out
@@ -146,27 +186,30 @@ void app_main(void)
     while (true){
         ESP_LOGI(TAG, "Waiting for events...");
 
-        uint32_t app_event = awaiting_event();
-
+        uint32_t app_event = app_awaiting_event();
+        ESP_LOGI(TAG, "STATE: %s: 0x%lx", app_state_string(app_state), (uint32_t)app_state);
         switch (app_event){
+            case APP_EVENT_WIFI_START:
+                ESP_LOGI(TAG, "APP_EVENT_WIFI_START");
+                if (app_state == APP_STATE_NORMAL_OPERATION){
+                    wifi_connect();
+                }
+                break;
+
             case APP_EVENT_BLE_RECEIVE_POP_DONE:
                 ESP_LOGI(TAG, "APP_EVENT_BLE_RECEIVE_POP_DONE");
                 if (app_state == APP_STATE_AWAITING_BLE_RECEIVE_POP){
+                    app_state = APP_STATE_AWAITING_WIFI_SCAN_DONE;
                     wifi_start_scan();
                     ESP_LOGI(TAG, "new state -> APP_STATE_AWAITING_WIFI_SCAN_DONE");
-                    app_state = APP_STATE_AWAITING_WIFI_SCAN_DONE;
                 }
                 break;
 
             case APP_EVENT_WIFI_SCAN_DONE:
                 ESP_LOGI(TAG, "APP_EVENT_WIFI_SCAN_DONE");
                 if (app_state == APP_STATE_AWAITING_WIFI_SCAN_DONE){
-                    if (ble_notify_wifi_scan()){
-                        ESP_LOGI(TAG, "new state -> APP_STATE_AWAITING_BLE_NOTIFY_WIFI_SCAN_DONE");
-                        app_state = APP_STATE_AWAITING_BLE_NOTIFY_WIFI_SCAN_DONE;
-                    } else {
-                        // TODO
-                    }
+                    app_state = APP_STATE_AWAITING_BLE_NOTIFY_WIFI_SCAN_DONE;
+                    ble_notify_wifi_scan();
                 }
                 break;
 
@@ -183,13 +226,17 @@ void app_main(void)
                     // if (ble_notify_wifi_creds(true)) {
                     //     app_state = APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE;
                     // }
+                    app_state = APP_STATE_AWAITING_WIFI_CONNECTED;
+                    wifi_reinit();
                 }
                 break;
 
             case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE:
                 ESP_LOGI(TAG, "APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE");
                 if (app_state == APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE){
-                    app_state = APP_STATE_AWAITING_BLE_RECEIVE_CA_CERT;
+                    app_state = APP_STATE_NORMAL_OPERATION;
+
+                    //app_state = APP_STATE_AWAITING_BLE_RECEIVE_CA_CERT;
                 }
                 break;
 
@@ -244,7 +291,7 @@ void app_main(void)
 
 
             default:
-                ESP_LOGI(TAG, "default");
+                ESP_LOGI(TAG, "ERROR: non implemented event: %s, nr: %ld", app_event_string(app_event), app_event);
                 break;
         }
 

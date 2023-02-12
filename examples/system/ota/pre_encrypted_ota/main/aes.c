@@ -3,6 +3,7 @@
 #include <string.h>
 #include "aes.h"
 #include "nvs.h"
+#include "misc.h"
 
 static const char *TAG = "AES";
 
@@ -24,47 +25,17 @@ void aes_ctr_deinit()
 {
     mbedtls_aes_free(&aes);
 }
-void aes_ctr_crypto(char *input, unsigned char *output)
-{
-    const unsigned char *const_input = (const unsigned char *)input;
-    size_t input_len = strlen((const char *)input);
-    ESP_LOGI(TAG, "input_len %d", input_len);
 
+void aes_ctr_crypto(char *encrypted_string, char *decrypted_string, size_t size)
+{
+    char encrypted_u8[size];
+    unsigned char decrypted_u8[size];
+    u8_array_from_hex_string(encrypted_string, encrypted_u8, size);
+    const unsigned char *input = (const unsigned char *)encrypted_u8;
     size_t nc_off = 0;
     unsigned char nonce_counter[16] = {0};
     unsigned char stream_block[16] = {0};
-    mbedtls_aes_crypt_ctr(&aes, input_len, &nc_off, nonce_counter, stream_block, const_input, output);
-    //ESP_LOGI(TAG, "AES KEY: ");
-    //ESP_LOG_BUFFER_HEX(TAG, key, sizeof(key));
+    mbedtls_aes_crypt_ctr(&aes, size, &nc_off, nonce_counter, stream_block, input, decrypted_u8);
+    ascii_string_from_u8_array(decrypted_u8, decrypted_string, size);
 }
-
-// void aes_ctr_crypto(char *encrypted_string, char *decrypted_string, size_t size)
-// {
-//     char encrypted_u8[size];
-//     unsigned char decrypted_u8[size];
-//     //unsigned char decrypted_string[ctxt->om->om_len / 2 ];
-//     ESP_LOGI(TAG, "encrypted_string: ");
-//     ESP_LOG_BUFFER_HEX(TAG, encrypted_string, sizeof(encrypted_string));
-
-//     u8_array_from_hex_string(encrypted_string, encrypted_u8, size);
-//     ESP_LOGI(TAG, "encrypted_u8: ");
-//     ESP_LOG_BUFFER_HEX(TAG, encrypted_u8, sizeof(encrypted_u8));
-
-//     //nvs_get_aes_key_str(aes_key);
-//     const unsigned char *input = (const unsigned char *)encrypted_u8;
-//     size_t input_size = strlen((const char *)encrypted_u8);
-
-//     size_t nc_off = 0;
-//     unsigned char nonce_counter[16] = {0};
-//     unsigned char stream_block[16] = {0};
-//     mbedtls_aes_crypt_ctr(&aes, input_size, &nc_off, nonce_counter, stream_block, input, decrypted_u8);
-//     ESP_LOGI(TAG, "decrypted_u8: ");
-//     ESP_LOG_BUFFER_HEX(TAG, decrypted_u8, sizeof(decrypted_u8));
-//     ascii_string_from_u8_array(decrypted_u8, decrypted_string, size);
-//     ESP_LOGI(TAG, "decrypted_string: %s", decrypted_string);
-//     ESP_LOG_BUFFER_HEX(TAG, decrypted_string, sizeof(decrypted_string));
-
-//     //ESP_LOGI(TAG, "AES KEY: ");
-//     //ESP_LOG_BUFFER_HEX(TAG, key, sizeof(key));
-// }
 

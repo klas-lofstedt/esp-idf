@@ -283,19 +283,17 @@ bool ble_notify_wifi_scan(void)
     return true;
 }
 
-bool ble_notify_wifi_creds(bool status)
+bool ble_notify_provisioning_status(bool status)
 {
     char *json_str = NULL;
     cJSON *message_root = cJSON_CreateObject();
 
-    cJSON_AddStringToObject(message_root, "type", "wifi_creds");
+    cJSON_AddStringToObject(message_root, "type", "provision");
     if (status){
         cJSON_AddStringToObject(message_root, "status", "ok");
     } else {
         cJSON_AddStringToObject(message_root, "status", "error");
     }
-    cJSON_AddNumberToObject(message_root, "count", 0);
-
     json_str = cJSON_Print(message_root);
     cJSON_Delete(message_root);
 
@@ -404,7 +402,7 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {
 // BLE event handling
 static int ble_event_handler(struct ble_gap_event *event, void *arg)
 {
-    ESP_LOGI(TAG, "BLE EVENT: %d", event->type);
+    ESP_LOGI(TAG, "DEBUG BLE EVENT: %d", event->type);
     //ESP_LOGI(TAG, "conn_handle: %d", event->connect.conn_handle);
     conn_handle = event->connect.conn_handle;
 

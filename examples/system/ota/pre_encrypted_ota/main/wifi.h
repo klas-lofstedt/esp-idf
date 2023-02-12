@@ -14,6 +14,8 @@
 
 
 char* wifi_get_scan(void);
+bool wifi_can_do_scan(void);
+void wifi_prepare_scan(void);
 void wifi_start_scan(void);
 //void wifi_connect_to_network(void);
 void wifi_init(void);

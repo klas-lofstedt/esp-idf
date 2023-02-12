@@ -21,6 +21,7 @@
 
 
 static const char *TAG = "WIFI";
+static bool is_wifi_connecting = false;
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data);
@@ -39,7 +40,12 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
 {
-    ESP_LOGI(TAG,"DEBUG EVENT!!!!!! %ld", event_id);
+    if (event_base == WIFI_EVENT){
+        ESP_LOGI(TAG, "DEBUG WIFI EVENT: %ld", event_id);
+    }
+    if (event_base == IP_EVENT){
+        ESP_LOGI(TAG, "DEBUG IP EVENT: %ld", event_id);
+    }
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         ESP_LOGI(TAG, "Connect WiFi...");
@@ -51,6 +57,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         xEventGroupSetBits(app_event_group, APP_EVENT_WIFI_START);
 
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        is_wifi_connecting = false;
         //ESP_LOGI(TAG, "Reconnecting WiFi...");
         //xSemaphoreGive(wifi_connect_lock);
         //if (xSemaphoreTake(wifi_connect_lock, 0) == pdTRUE){
@@ -61,6 +68,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         xEventGroupSetBits(app_event_group, APP_EVENT_WIFI_DISCONNECTED);
 
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        is_wifi_connecting = false;
         //xSemaphoreGive(wifi_connect_lock);
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
@@ -73,9 +81,16 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-void wifi_start_scan(void)
+bool wifi_can_do_scan(void)
+{
+    return !is_wifi_connecting;
+}
+void wifi_prepare_scan(void)
 {
     esp_wifi_disconnect();
+}
+void wifi_start_scan(void)
+{
     wifi_scan_config_t scan_config = {
         .ssid = 0,
         .bssid = 0,
@@ -173,6 +188,7 @@ void wifi_reinit(void)
 
 void wifi_connect(void)
 {
+    is_wifi_connecting = true;
     esp_wifi_connect();
     // uint8_t wifi_ssid[WIFI_SSID_MAX_LEN];
     // uint8_t wifi_pwd[WIFI_PWD_MAX_LEN];

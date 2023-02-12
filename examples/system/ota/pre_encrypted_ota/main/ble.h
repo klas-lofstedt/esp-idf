@@ -13,7 +13,7 @@
 void ble_init(void);
 void ble_start(void);
 bool ble_notify_wifi_scan(void);
-bool ble_notify_wifi_creds(bool status);
+bool ble_notify_provisioning_status(bool status);
 bool ble_notify_ca_cert(bool status);
 void parse_ble_json_message(char *ble_message);
 

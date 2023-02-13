@@ -14,18 +14,10 @@
 
 
 char* wifi_get_scan(void);
-bool wifi_can_do_scan(void);
-void wifi_prepare_scan(void);
-bool wifi_check_if_connected(void);
 bool wifi_start_scan(void);
 void wifi_stop_scan(void);
-bool wifi_take_lock(int timeout_ms); // TODO static
-void wifi_give_lock(void); // TODO static
-//void wifi_connect_to_network(void);
 void wifi_init(void);
 void wifi_reinit(void);
-void wifi_deinit2(void);
 bool wifi_connect(void);
-void wifi_connect_propeller(void);
 
 #endif /* _WIFI_H_ */

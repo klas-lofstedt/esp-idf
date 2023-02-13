@@ -195,6 +195,7 @@ void app_main(void)
         switch (app_event){
             case APP_EVENT_WIFI_START:
                 ESP_LOGI(TAG, "APP_EVENT_WIFI_START");
+                //wifi_connect();
                 if (app_state == APP_STATE_NORMAL_OPERATION){
                     wifi_connect();
                 }
@@ -203,13 +204,16 @@ void app_main(void)
             case APP_EVENT_BLE_RECEIVE_POP_DONE:
                 ESP_LOGI(TAG, "APP_EVENT_BLE_RECEIVE_POP_DONE");
                 if (app_state == APP_STATE_AWAITING_BLE_RECEIVE_POP){
-                    if (wifi_can_do_scan()){
-                        app_state = APP_STATE_AWAITING_WIFI_SCAN_DONE;
-                        wifi_start_scan();
-                    } else {
-                        app_state = APP_STATE_AWAITING_WIFI_SCAN_READY;
-                        wifi_prepare_scan();
-                    }
+                    app_state = APP_STATE_AWAITING_WIFI_SCAN_DONE;
+                    wifi_start_scan();
+
+                    // if (wifi_can_do_scan()){
+                    //     app_state = APP_STATE_AWAITING_WIFI_SCAN_DONE;
+                    //     wifi_start_scan();
+                    // } else {
+                    //     app_state = APP_STATE_AWAITING_WIFI_SCAN_READY;
+                    //     wifi_prepare_scan();
+                    // }
                 }
                 break;
 
@@ -233,6 +237,14 @@ void app_main(void)
                 if (app_state == APP_STATE_AWAITING_BLE_RECEIVE_WIFI_CREDS){
                     app_state = APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE;
                     wifi_reinit();
+                    // if (wifi_check_if_connected()){
+                    //     // Check if wifi is connected as wifi_reinit won't trigger a new event
+                    //     // unless the status changes, e.g. if wifi is connected, and it's being
+                    //     // re-provisioned with the same credentials we still want the iOS app to
+                    //     // receive a notification that it's online.
+                    //     app_state = APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE;
+                    //     ble_notify_provisioning_status(true);
+                    // } // else do nothing and just wait for event
                 }
                 break;
 
@@ -240,7 +252,7 @@ void app_main(void)
                 ESP_LOGI(TAG, "APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE");
                 if (app_state == APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE){
                     app_state = APP_STATE_NORMAL_OPERATION;
-                    wifi_connect();
+                    //wifi_connect();
                 }
                 break;
 
@@ -269,10 +281,10 @@ void app_main(void)
                     app_state = APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE;
                     ble_notify_provisioning_status(true);
                 }
-                if (app_state == APP_STATE_AWAITING_WIFI_SCAN_READY) {
-                    app_state = APP_STATE_AWAITING_WIFI_SCAN_DONE;
-                    wifi_start_scan();
-                }
+                // if (app_state == APP_STATE_AWAITING_WIFI_SCAN_READY) {
+                //     app_state = APP_STATE_AWAITING_WIFI_SCAN_DONE;
+                //     wifi_start_scan();
+                // }
                 else {
                     app_state = APP_STATE_NORMAL_OPERATION;
                 }
@@ -280,22 +292,23 @@ void app_main(void)
                 break;
 
             case APP_EVENT_WIFI_DISCONNECTED:
-                if (app_state == APP_STATE_NORMAL_OPERATION){
-                    ESP_LOGI(TAG, "APP_EVENT_WIFI_DISCONNECTED");
-                    wifi_connect();
-                }
-                if (app_state == APP_STATE_AWAITING_WIFI_CONNECTED){
-                    ESP_LOGI(TAG, "APP_EVENT_WIFI_DISCONNECTED");
-                    wifi_connect();
-                }
-                if (app_state == APP_STATE_AWAITING_WIFI_SCAN_READY) {
-                    app_state = APP_STATE_AWAITING_WIFI_SCAN_DONE;
-                    wifi_start_scan();
-                }
+                // if (app_state == APP_STATE_NORMAL_OPERATION){
+                //     ESP_LOGI(TAG, "APP_EVENT_WIFI_DISCONNECTED");
+                //     wifi_connect();
+                // }
+                // if (app_state == APP_STATE_AWAITING_WIFI_CONNECTED){
+                //     ESP_LOGI(TAG, "APP_EVENT_WIFI_DISCONNECTED");
+                //     wifi_connect();
+                // }
+                // if (app_state == APP_STATE_AWAITING_WIFI_SCAN_READY) {
+                //     app_state = APP_STATE_AWAITING_WIFI_SCAN_DONE;
+                //     wifi_start_scan();
+                // }
                 if (app_state == APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE){
                     app_state = APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE;
                     ble_notify_provisioning_status(false);
                 }
+                wifi_connect();
                 break;
 
             case APP_EVENT_BLE_GAP_CONNECT:

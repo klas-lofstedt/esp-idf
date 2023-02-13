@@ -252,7 +252,7 @@ bool ble_notify_wifi_scan(void)
         ESP_LOGI(TAG, "SSID: %s, RSSI: %d", ap_list[i].ssid, ap_list[i].rssi);
     }
 
-    esp_wifi_scan_stop();
+    wifi_stop_scan();
 
     for(int i = 0; i < apCount; i++) {
         char *json_str = NULL;

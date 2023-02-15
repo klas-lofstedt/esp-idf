@@ -36,13 +36,14 @@ static uint32_t app_awaiting_event(void)
         APP_EVENT_BLE_RECEIVE_WIFI_CREDS_FAIL |
         APP_EVENT_BLE_RECEIVE_CA_CERT_DONE |
         APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE |
-        APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE |
+        APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE |
         APP_EVENT_BLE_NOTIFY_CA_CERT_DONE |
         APP_EVENT_WIFI_START |
         APP_EVENT_WIFI_DISCONNECTED |
         APP_EVENT_WIFI_CONNECTED |
         APP_EVENT_WIFI_SCAN_DONE |
-        APP_EVENT_UNINITIALISED,
+        APP_EVENT_UNINITIALISED |
+        APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE,
         //APP_EVENT_BLE_NOTIFY_DONE,
 
         pdTRUE, pdFALSE, portMAX_DELAY);
@@ -63,13 +64,14 @@ static const char* app_event_string(app_events_t event)
         case APP_EVENT_BLE_RECEIVE_WIFI_CREDS_FAIL: return "APP_EVENT_BLE_RECEIVE_WIFI_CREDS_FAIL";
         case APP_EVENT_BLE_RECEIVE_CA_CERT_DONE: return "APP_EVENT_BLE_RECEIVE_CA_CERT_DONE";
         case APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE: return "APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE";
-        case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE: return "APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE";
+        case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE: return "APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE";
         case APP_EVENT_BLE_NOTIFY_CA_CERT_DONE: return "APP_EVENT_BLE_NOTIFY_CA_CERT_DONE";
         case APP_EVENT_WIFI_START: return "APP_EVENT_WIFI_START";
         case APP_EVENT_WIFI_DISCONNECTED: return "APP_EVENT_WIFI_DISCONNECTED";
         case APP_EVENT_WIFI_CONNECTED: return "APP_EVENT_WIFI_CONNECTED";
         case APP_EVENT_WIFI_SCAN_DONE: return "APP_EVENT_WIFI_SCAN_DONE";
         case APP_EVENT_UNINITIALISED: return "APP_EVENT_UNINITIALISED";
+        case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE: return "APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE";
         default: return "UNKNOWN_APP_EVENT";
     }
 }
@@ -188,16 +190,21 @@ void app_main(void)
                     wifi_connect();
                     break;
                 case APP_EVENT_WIFI_CONNECTED:
-                    app_event_expected = APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE;
+                    app_event_expected = APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE;
                     ble_notify_provisioning_status(true);
                     break;
                 case APP_EVENT_WIFI_DISCONNECTED:
-                    app_event_expected = APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE;
+                    app_event_expected = APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE;
                     ble_notify_provisioning_status(false);
                     break;
-                case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE:
+                case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE:
                     app_state = APP_STATE_NORMAL_OPERATION;
-                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_START;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED;
+                    break;
+                case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE:
+                    app_state = APP_STATE_NORMAL_OPERATION;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_CONNECTED | APP_EVENT_WIFI_DISCONNECTED;
+                    wifi_connect();
                     break;
                 default:
                     // TODO: print that event was not handled or reboot?
@@ -217,6 +224,7 @@ void app_main(void)
                 case APP_EVENT_WIFI_CONNECTED:
                     app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED;
                     // TODO: do nothing? or expect mqtt or OTA etc
+                    xTaskCreate(&pre_encrypted_ota_task, "pre_encrypted_ota_task", 1024 * 8, NULL, 5, NULL);
                     break;
                 case APP_EVENT_WIFI_DISCONNECTED:
                     app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_CONNECTED | APP_EVENT_WIFI_DISCONNECTED;

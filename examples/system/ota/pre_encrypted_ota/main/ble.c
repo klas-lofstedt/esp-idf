@@ -235,7 +235,11 @@ bool ble_notify_provisioning_status(bool status)
     }
     cJSON_free(json_str);
 
-    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_NOTIFY_WIFI_CREDS_DONE);
+    if (status){
+        xEventGroupSetBits(app_event_group, APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE);
+    } else {
+        xEventGroupSetBits(app_event_group, APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE);
+    }
 
     return true;
 }

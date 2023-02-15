@@ -89,7 +89,7 @@ void pre_encrypted_ota_task(void *pvParameter)
 
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t config = {
-        .url = "https://esp32-fw-test1.s3-ap-southeast-2.amazonaws.com/pre_encrypted_ota_secure2.bin",//CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL,
+        .url = "https://esp32-fw-test1.s3-ap-southeast-2.amazonaws.com/pre_encrypted_ota_secure4.bin",//CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL,
         .cert_pem = server_cert_pem_start,
         .timeout_ms = CONFIG_EXAMPLE_OTA_RECV_TIMEOUT,
         .keep_alive_enable = true,

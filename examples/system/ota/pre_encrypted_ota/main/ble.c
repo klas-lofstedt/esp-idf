@@ -42,7 +42,7 @@ char rx_data[255];
 
 static bool handle_json_string(char *json_input);
 static int ble_write_creds_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
-static int ble_device_read_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
+//static int ble_device_read_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
 static int ble_notify_dummy_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
 static int ble_event_handler(struct ble_gap_event *event, void *arg);
 //static int ble_device_notify(int16_t conn_handle, uint32_t data);
@@ -85,8 +85,13 @@ bool handle_json_string(char *json_input)//, char *ssid, char *password)
         // memcpy(ssid, ssid_temp, strlen(ssid_temp));
         // memcpy(password, password_temp, strlen(password_temp));
     } else if (strcmp(type->valuestring, "cert") == 0){
-        //char *cert = cJSON_GetObjectItemCaseSensitive(root, "line")->valuestring;
-        //int *count = cJSON_GetObjectItemCaseSensitive(root, "count")->valueint;
+        char *cert = cJSON_GetObjectItemCaseSensitive(root, "line")->valuestring;
+        int count = cJSON_GetObjectItemCaseSensitive(root, "count")->valueint;
+        ESP_LOGI(TAG, "count: %d, %s", count, cert);
+
+        if (count == 0){
+            xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE);
+        }
     } else {
         ESP_LOGI(TAG, "Error: JSON has unknown subtype ");
         cJSON_Delete(root);
@@ -96,22 +101,18 @@ bool handle_json_string(char *json_input)//, char *ssid, char *password)
     //printf("Received: %s, %s, %s\n", type, ssid, password);
     //ESP_LOGI(TAG, "Received: %s, %s, %s", type, ssid_temp, password_temp);
 
-    cJSON_Delete(root); // DONT move this before the print!!!
+    cJSON_Delete(root);
     return true;
 }
 // Write data to ESP32 defined as server
 static int ble_write_pop_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     memset(rx_data, 0, sizeof(rx_data));
-
-    //printf("Data from the client: %d, %d\n", ctxt->om->om_len, ctxt->om->om_data);
     memcpy(rx_data,ctxt->om->om_data,ctxt->om->om_len);
     ESP_LOGI(TAG, "POP: %s, conn_handle %d", rx_data, conn_handle);
     char pop_ble[BLE_POP_SIZE * 2];
     memcpy(pop_ble, rx_data, BLE_POP_SIZE * 2);
-    //aes_ctr_crypto(rx_data, pop);
-    //ESP_LOGI(TAG, "Unencrypted POP: %s", pop);
-    char pop_nvs[32];
+    char pop_nvs[BLE_POP_SIZE * 2];
     nvs_get_ble_pop_str(pop_nvs);
     ESP_LOGI(TAG, "NVS POP: %s", pop_nvs);
     if (strncmp(pop_nvs, pop_ble, BLE_POP_SIZE * 2) == 0){
@@ -119,19 +120,8 @@ static int ble_write_pop_cb(uint16_t conn_handle, uint16_t attr_handle, struct b
     } else {
         ESP_LOGI(TAG, "POP error");
     }
-
-    //printf("Receive Data =  %.*s, conn_handle = %d\n", WIFI_PWD_MAX_LEN, rx_data, conn_handle);
     xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_POP_DONE);
 
-    //ble_device_notify(0, "hej");
-
-    // if (nvs_wifi_set_pwd(rx_data)){
-    //     ESP_LOGI(TAG, "Write WiFi PWD successful");
-    //     ESP_LOGI(TAG, "Rebooting...");
-    //     esp_restart();
-    // } else {
-    //     ESP_LOGI(TAG, "Write WiFi PWD failed");
-    // }
     return 0;
 }
 
@@ -143,18 +133,11 @@ static int ble_write_creds_cb(uint16_t conn_handle, uint16_t attr_handle, struct
     char decrypted_string[ctxt->om->om_len / 2];
     aes_ctr_crypto(rx_data, decrypted_string, ctxt->om->om_len / 2 );
 
-    // char ssid[WIFI_SSID_MAX_LEN];
-    // char password[WIFI_PWD_MAX_LEN];
-    // memset(ssid, 0, sizeof(ssid));
-    // memset(password, 0, sizeof(password));
-
-    if (handle_json_string(decrypted_string)) {
-        xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE);
+    if (!handle_json_string(decrypted_string)) {
+        xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_WIFI_CREDS_FAIL);
     } else {
         xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE);
     }
-    // ESP_LOGI(TAG, "Received in BLE: %s, %s", ssid, password);
-
     // ESP_LOGI(TAG, "SSID: ");
     // ESP_LOG_BUFFER_HEX(TAG, ssid, strlen(ssid));
     // ESP_LOGI(TAG, "PropellerAero: ");
@@ -163,83 +146,26 @@ static int ble_write_creds_cb(uint16_t conn_handle, uint16_t attr_handle, struct
     // ESP_LOG_BUFFER_HEX(TAG, password, strlen(password));
     // ESP_LOGI(TAG, "hejklas1234: ");
     // ESP_LOG_BUFFER_HEX(TAG, "hejklas1234", strlen("hejklas1234"));
-
-
-
-
-    //ble_device_notify(0, "hej");
-
-    // if (nvs_wifi_set_pwd(rx_data)){
-    //     ESP_LOGI(TAG, "Write WiFi PWD successful");
-    //     ESP_LOGI(TAG, "Rebooting...");
-    //     esp_restart();
-    // } else {
-    //     ESP_LOGI(TAG, "Write WiFi PWD failed");
-    // }
     return 0;
 }
 
 
-static int ble_write_cert_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
-{
-    //printf("Data from the client: %d, %d\n", ctxt->om->om_len, ctxt->om->om_data);
-    memcpy(rx_data,ctxt->om->om_data,ctxt->om->om_len);
-    ESP_LOGI(TAG, "cert: %s", rx_data);
-
-    //printf("Receive Data =  %.*s, conn_handle = %d\n", WIFI_PWD_MAX_LEN, rx_data, conn_handle);
-    xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_CA_CERT_DONE);
-
-    //ble_device_notify(0, "hej");
-
-    // if (nvs_wifi_set_pwd(rx_data)){
-    //     ESP_LOGI(TAG, "Write WiFi PWD successful");
-    //     ESP_LOGI(TAG, "Rebooting...");
-    //     esp_restart();
-    // } else {
-    //     ESP_LOGI(TAG, "Write WiFi PWD failed");
-    // }
-    return 0;
-}
-
-// void parse_json_ble_message(char *message)
+// static int ble_write_cert_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 // {
-//     cJSON *message_root = NULL;
-//     message_root = cJSON_Parse(message);
-//     if(message_root == NULL){
-//         ESP_LOGI(TAG, "JSON parse fail");
-//         return;
-//     }
-
-//     char *ssid = cJSON_GetObjectItem(message_root, "ssid") ->valuestring;
-//     char *pwd = cJSON_GetObjectItem(message_root, "pwd") ->valuestring;
-//     char *id = cJSON_GetObjectItem(message_root, "id") ->valuestring;
-
-//     // Update global device struct
-//     if (!strcmp(ping, "online")){
-//         device_status.ping = true;
-//     }
-//     if (!strcmp(ping, "offline")){
-//         device_status.ping = false;
-//     }
-//     if (!strcmp(status, "on")){
-//         device_status.status = true;
-//         gpio_set_level(PIN_LED, true);
-//     }
-//     if (!strcmp(status, "off")){
-//         device_status.status = false;
-//         gpio_set_level(PIN_LED, false);
-//     }
-//     cJSON_Delete(message_root);
-
-//     ESP_LOGI(TAG, "MQTT Receive: status %d, ping %d", device_status.status, device_status.ping);
+//     //printf("Data from the client: %d, %d\n", ctxt->om->om_len, ctxt->om->om_data);
+//     memcpy(rx_data,ctxt->om->om_data,ctxt->om->om_len);
+//     ESP_LOGI(TAG, "cert: %s", rx_data);
+//     //printf("Receive Data =  %.*s, conn_handle = %d\n", WIFI_PWD_MAX_LEN, rx_data, conn_handle);
+//     xEventGroupSetBits(app_event_group, APP_EVENT_BLE_RECEIVE_CA_CERT_DONE);
+//     return 0;
 // }
 
 // Read data from ESP32 defined as server
-static int ble_device_read_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
-{
-    os_mbuf_append(ctxt->om, "OK", strlen("OK"));
-    return 0;
-}
+// static int ble_device_read_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
+// {
+//     os_mbuf_append(ctxt->om, "OK", strlen("OK"));
+//     return 0;
+// }
 
 bool ble_notify_wifi_scan(void)
 {
@@ -371,11 +297,11 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {
                 .flags = BLE_GATT_CHR_F_WRITE,
                 .access_cb = ble_write_creds_cb
             },
-            {
-                .uuid = BLE_UUID16_DECLARE(CHAR_WRITE_CERT_UUID),           // Define UUID for writing
-                .flags = BLE_GATT_CHR_F_WRITE,
-                .access_cb = ble_write_cert_cb
-            },
+            // {
+            //     .uuid = BLE_UUID16_DECLARE(CHAR_WRITE_CERT_UUID),           // Define UUID for writing
+            //     .flags = BLE_GATT_CHR_F_WRITE,
+            //     .access_cb = ble_write_cert_cb
+            // },
             {
                 .uuid = BLE_UUID16_DECLARE(CHAR_NOTIFY_SCAN_UUID),
                 .access_cb = ble_notify_dummy_cb,
@@ -388,11 +314,11 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {
             //     .val_handle = &control_notif_handle,
             //     .flags = BLE_GATT_CHR_F_NOTIFY
             // },
-            {
-                .uuid = BLE_UUID16_DECLARE(CHAR_READ_UUID),           // Define UUID for reading
-                .flags = BLE_GATT_CHR_F_READ,
-                .access_cb = ble_device_read_cb
-            },
+            // {
+            //     .uuid = BLE_UUID16_DECLARE(CHAR_READ_UUID),           // Define UUID for reading
+            //     .flags = BLE_GATT_CHR_F_READ,
+            //     .access_cb = ble_device_read_cb
+            // },
             {0}
         }
     },

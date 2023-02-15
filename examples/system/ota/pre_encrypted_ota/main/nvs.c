@@ -175,6 +175,16 @@ bool nvs_wifi_set_pwd(const char* str)
     return false;
 }
 
+bool nvs_is_production_done(void)
+{
+    return true;
+}
+
+bool nvs_is_provision_done(void)
+{
+    return true;
+}
+
 bool nvs_wifi_set_provisioned(bool set_provision)
 {
     ESP_LOGI(TAG, "NVS wifi provisioned input: %d", set_provision);

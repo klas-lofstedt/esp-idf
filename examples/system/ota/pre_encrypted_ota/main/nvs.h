@@ -10,6 +10,8 @@
 
 #include <stdbool.h>
 
+bool nvs_is_production_done(void);
+bool nvs_is_provision_done(void);
 void nvs_set_ble_pop(void);
 void nvs_set_aes_key(void);
 void nvs_get_ble_pop_arr(uint8_t *pop);

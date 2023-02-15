@@ -82,14 +82,14 @@ static esp_err_t _decrypt_cb(decrypt_cb_arg_t *args, void *user_ctx)
 
 void pre_encrypted_ota_task(void *pvParameter)
 {
-    ESP_LOGI(TAG, "Starting Pre Encrypted OTA example image 2");
+    ESP_LOGI(TAG, "Starting Pre Encrypted OTA example image 1");
 
     vTaskDelay(2000 / portTICK_PERIOD_MS);
 
 
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t config = {
-        .url = "https://esp32-fw-test1.s3-ap-southeast-2.amazonaws.com/pre_encrypted_ota_secure6.bin",//CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL,
+        .url = "https://esp32-fw-test1.s3-ap-southeast-2.amazonaws.com/pre_encrypted_ota_secure5.bin",//CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL,
         .cert_pem = server_cert_pem_start,
         .timeout_ms = CONFIG_EXAMPLE_OTA_RECV_TIMEOUT,
         .keep_alive_enable = true,

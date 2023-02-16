@@ -224,7 +224,7 @@ void app_main(void)
                 case APP_EVENT_WIFI_CONNECTED:
                     app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED;
                     // TODO: do nothing? or expect mqtt or OTA etc
-                    xTaskCreate(&pre_encrypted_ota_task, "pre_encrypted_ota_task", 1024 * 8, NULL, 5, NULL);
+                    ota_update();
                     break;
                 case APP_EVENT_WIFI_DISCONNECTED:
                     app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_CONNECTED | APP_EVENT_WIFI_DISCONNECTED;

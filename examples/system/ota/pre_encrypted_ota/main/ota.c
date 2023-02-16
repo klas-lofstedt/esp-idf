@@ -80,11 +80,11 @@ static esp_err_t _decrypt_cb(decrypt_cb_arg_t *args, void *user_ctx)
     return ESP_OK;
 }
 
-void pre_encrypted_ota_task(void *pvParameter)
+bool ota_update(void)
 {
     ESP_LOGI(TAG, "Starting Pre Encrypted OTA example image 1");
 
-    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 
 
     esp_err_t ota_finish_err = ESP_OK;
@@ -100,22 +100,8 @@ void pre_encrypted_ota_task(void *pvParameter)
     esp_decrypt_handle_t decrypt_handle = esp_encrypted_img_decrypt_start(&cfg);
     if (!decrypt_handle) {
         ESP_LOGE(TAG, "OTA upgrade failed");
-        vTaskDelete(NULL);
+        return false;
     }
-
-#ifdef CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL_FROM_STDIN
-    char url_buf[OTA_URL_SIZE];
-    if (strcmp(config.url, "FROM_STDIN") == 0) {
-        example_configure_stdin_stdout();
-        fgets(url_buf, OTA_URL_SIZE, stdin);
-        int len = strlen(url_buf);
-        url_buf[len - 1] = '\0';
-        config.url = url_buf;
-    } else {
-        ESP_LOGE(TAG, "Configuration mismatch: wrong firmware upgrade image url");
-        abort();
-    }
-#endif
 
 #ifdef CONFIG_EXAMPLE_SKIP_COMMON_NAME_CHECK
     config.skip_cert_common_name_check = true;
@@ -135,7 +121,7 @@ void pre_encrypted_ota_task(void *pvParameter)
     esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
-        vTaskDelete(NULL);
+        return false;
     }
 
     while (1) {
@@ -161,18 +147,20 @@ void pre_encrypted_ota_task(void *pvParameter)
         if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
             ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
+
             esp_restart();
+            // TODO return true;
         } else {
             if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED) {
                 ESP_LOGE(TAG, "Image validation failed, image is corrupted");
             }
             ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
-            vTaskDelete(NULL);
+            return false;
         }
     }
 
 ota_end:
     esp_https_ota_abort(https_ota_handle);
     ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed");
-    vTaskDelete(NULL);
+    return false;
 }

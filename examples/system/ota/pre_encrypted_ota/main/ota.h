@@ -8,6 +8,6 @@
 #ifndef _OTA_H_
 #define _OTA_H_
 
-void pre_encrypted_ota_task(void *pvParameter);
+bool ota_update(void);
 
 #endif /* _OTA_H_ */

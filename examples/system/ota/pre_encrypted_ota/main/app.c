@@ -12,6 +12,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <cJSON.h>
+//#include "gpio.h"
+#include "mqtt.h"
 
 
 static const char *TAG = "APP";
@@ -139,6 +141,7 @@ void app_main(void)
     app_events_t app_event_expected = APP_EVENT_UNINITIALISED;
 
     nvs_init();
+    //gpio_init();
     aes_ctr_init();
     wifi_init();
     ble_init();
@@ -224,7 +227,8 @@ void app_main(void)
                 case APP_EVENT_WIFI_CONNECTED:
                     app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED;
                     // TODO: do nothing? or expect mqtt or OTA etc
-                    ota_update();
+                    xTaskCreate(&mqtt_task, "mqtt_task", 8192, NULL, 5, NULL);
+                    //ota_update();
                     break;
                 case APP_EVENT_WIFI_DISCONNECTED:
                     app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_CONNECTED | APP_EVENT_WIFI_DISCONNECTED;

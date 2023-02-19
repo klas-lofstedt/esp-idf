@@ -1,8 +1,10 @@
 idf_build_get_property(project_dir PROJECT_DIR)
-idf_component_register(SRCS "app.c" "nvs.c" "wifi.c" "ble.c" "ota.c" "misc.c" "aes.c"
+idf_component_register(SRCS "app.c" "nvs.c" "wifi.c" "ble.c" "ota.c" "misc.c" "aes.c" "mqtt.c"
                     INCLUDE_DIRS "."
                     EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem
-                                   ${project_dir}/rsa_key/private.pem)
+                                   ${project_dir}/rsa_key/private.pem
+                                   ${project_dir}/client_certs/aws_client_cert.pem
+                                   ${project_dir}/client_certs/aws_client_key.pem)
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=unused-const-variable)
 

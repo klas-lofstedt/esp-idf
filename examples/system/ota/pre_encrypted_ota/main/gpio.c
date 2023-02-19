@@ -17,26 +17,30 @@
 
 static const char *TAG = "GPIO";
 
-QueueHandle_t gpio_evt_queue = NULL;
-
-
-bool led_status = false;
-static void IRAM_ATTR gpio_isr_handler(void *args)
+void gpio_toggle_led(bool status)
 {
-    gpio_set_level(PIN_LED, led_status);
-    //uint32_t gpio_num = (uint32_t) arg;
-    xQueueSendFromISR(gpio_evt_queue, &led_status, NULL);
-    led_status = !led_status;
-
-
-    //ESP_LOGD(TAG, "Interrupt");
-
-
-    // int pin_number = (int)args;
-    // if (pin_number == PIN_BUTTON) {
-    //     // Do mqtt and led toggle
-    // }
+    gpio_set_level(PIN_LED, status);
 }
+//QueueHandle_t gpio_evt_queue = NULL;
+
+
+// bool led_status = false;
+// static void IRAM_ATTR gpio_isr_handler(void *args)
+// {
+//     gpio_set_level(PIN_LED, led_status);
+//     //uint32_t gpio_num = (uint32_t) arg;
+//     xQueueSendFromISR(gpio_evt_queue, &led_status, NULL);
+//     led_status = !led_status;
+
+
+//     //ESP_LOGD(TAG, "Interrupt");
+
+
+//     // int pin_number = (int)args;
+//     // if (pin_number == PIN_BUTTON) {
+//     //     // Do mqtt and led toggle
+//     // }
+// }
 
 // static void gpio_task_example(void* arg)
 // {
@@ -53,7 +57,7 @@ static void IRAM_ATTR gpio_isr_handler(void *args)
 
 void gpio_init(void)
 {
-    gpio_evt_queue = xQueueCreate(10, sizeof(bool));
+    //gpio_evt_queue = xQueueCreate(10, sizeof(bool));
     // Production pin to read MAC address
     gpio_pad_select_gpio(PIN_JIG_CONTROLLED_MAC); // Controlled by jig, run ESP32 normally or print MAC
     //gpio_pad_select_gpio(18); // STM32 reset
@@ -71,30 +75,17 @@ void gpio_init(void)
 
     gpio_set_level(PIN_LED_POWER, true);
 
-    //gpio_set_direction(PIN_BUTTON, GPIO_MODE_INPUT);
-    //gpio_pulldown_en(PIN_BUTTON);
-    //gpio_pullup_dis(PIN_BUTTON);
-    //gpio_set_intr_type(PIN_BUTTON, GPIO_INTR_POSEDGE);
-    //gpio_install_isr_service(0);
-    //gpio_isr_handler_add(PIN_BUTTON, gpio_interrupt_handler, (void *)PIN_BUTTON);
-
-    gpio_config_t io_conf = {};
-    //interrupt of rising edge
-    io_conf.intr_type = GPIO_INTR_POSEDGE;
-    //bit mask of the pins, use GPIO4/5 here
-    io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
-    //set as input mode
-    io_conf.mode = GPIO_MODE_INPUT;
-    //enable pull-up mode
-    io_conf.pull_up_en = 1;
-    gpio_config(&io_conf);
-
-    //change gpio interrupt type for one pin
-    //gpio_set_intr_type(PIN_BUTTON, GPIO_INTR_ANYEDGE);
-
-        //install gpio isr service
-    gpio_install_isr_service(0);
-    //hook isr handler for specific gpio pin
-    gpio_isr_handler_add(PIN_BUTTON, gpio_isr_handler, (void*) PIN_BUTTON);
-
+    // gpio_config_t io_conf = {};
+    // //interrupt of rising edge
+    // io_conf.intr_type = GPIO_INTR_POSEDGE;
+    // //bit mask of the pins, use GPIO4/5 here
+    // io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
+    // //set as input mode
+    // io_conf.mode = GPIO_MODE_INPUT;
+    // //enable pull-up mode
+    // io_conf.pull_up_en = 1;
+    // gpio_config(&io_conf);
+    // gpio_install_isr_service(0);
+    // //hook isr handler for specific gpio pin
+    // gpio_isr_handler_add(PIN_BUTTON, gpio_isr_handler, (void*) PIN_BUTTON);
 }

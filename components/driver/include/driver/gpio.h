@@ -14,6 +14,7 @@
 #include "hal/gpio_types.h"
 #include "esp_rom_gpio.h"
 #include "driver/gpio_etm.h"
+#include "rom/gpio.h"
 
 #ifdef __cplusplus
 extern "C" {

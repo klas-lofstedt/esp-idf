@@ -12,7 +12,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <cJSON.h>
-//#include "gpio.h"
+#include "gpio.h"
 #include "mqtt.h"
 
 
@@ -81,19 +81,7 @@ static const char* app_event_string(app_events_t event)
 static const char* app_state_string(app_states_t state)
 {
     switch (state) {
-        case APP_STATE_AWAITING_INIT: return "APP_STATE_AWAITING_INIT";
-        case APP_STATE_AWAITING_BLE_CONNECTION: return "APP_STATE_AWAITING_BLE_CONNECTION";
-        case APP_STATE_AWAITING_BLE_RECEIVE_POP: return "APP_STATE_AWAITING_BLE_RECEIVE_POP";
-        case APP_STATE_AWAITING_WIFI_SCAN_DONE: return "APP_STATE_AWAITING_WIFI_SCAN_DONE";
-        case APP_STATE_AWAITING_BLE_NOTIFY_WIFI_SCAN_DONE: return "APP_STATE_AWAITING_BLE_NOTIFY_WIFI_SCAN_DONE";
-        case APP_STATE_AWAITING_BLE_RECEIVE_WIFI_CREDS: return "APP_STATE_AWAITING_BLE_RECEIVE_WIFI_CREDS";
-        case APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE: return "APP_STATE_AWAITING_BLE_NOTIFY_WIFI_CREDS_DONE";
-        case APP_STATE_AWAITING_BLE_RECEIVE_CA_CERT: return "APP_STATE_AWAITING_BLE_RECEIVE_CA_CERT";
-        case APP_STATE_AWAITING_BLE_NOTIFY_CA_CERT_DONE: return "APP_STATE_AWAITING_BLE_NOTIFY_CA_CERT_DONE";
-        case APP_STATE_AWAITING_WIFI_CONNECTED: return "APP_STATE_AWAITING_WIFI_CONNECTED";
-        case APP_STATE_AWAITING_WIFI_DISCONNECTED: return "APP_STATE_AWAITING_WIFI_DISCONNECTED";
         case APP_STATE_NORMAL_OPERATION: return "APP_STATE_NORMAL_OPERATION";
-        case APP_STATE_AWAITING_WIFI_SCAN_READY: return "APP_STATE_AWAITING_WIFI_SCAN_READY";
         case APP_STATE_DO_PRODUCTION: return "APP_STATE_DO_PRODUCTION";
         case APP_STATE_DO_PROVISION: return "APP_STATE_DO_PROVISION";
         case APP_STATE_UNINITIALISED: return "APP_STATE_UNINITIALISED";
@@ -141,7 +129,7 @@ void app_main(void)
     app_events_t app_event_expected = APP_EVENT_UNINITIALISED;
 
     nvs_init();
-    //gpio_init();
+    gpio_init();
     aes_ctr_init();
     wifi_init();
     ble_init();
@@ -226,8 +214,7 @@ void app_main(void)
                     break;
                 case APP_EVENT_WIFI_CONNECTED:
                     app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED;
-                    // TODO: do nothing? or expect mqtt or OTA etc
-                    xTaskCreate(&mqtt_task, "mqtt_task", 8192, NULL, 5, NULL);
+                    mqtt_init();
                     //ota_update();
                     break;
                 case APP_EVENT_WIFI_DISCONNECTED:

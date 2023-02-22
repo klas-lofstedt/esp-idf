@@ -192,22 +192,19 @@ void app_main(void)
                     break;
                 case APP_EVENT_WIFI_DISCONNECTED:
                     app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE;
-                    //mqtt_disconnect();
                     ble_notify_provisioning_status(false);
                     break;
                 case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE:
-                    app_state = APP_STATE_NORMAL_OPERATION;
-                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_DATA_SENT;
+                    vTaskDelay(2000 / portTICK_PERIOD_MS);
                     esp_restart();
                     break;
                 case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE:
-                    app_state = APP_STATE_NORMAL_OPERATION;
-                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_CONNECTED | APP_EVENT_WIFI_DISCONNECTED;
-                    wifi_connect();
+                    vTaskDelay(2000 / portTICK_PERIOD_MS);
+                    esp_restart();
                     break;
                 default:
                     ESP_LOGI(TAG, "ERROR: Event broke provision state machine :-)");
-                    esp_restart();
+                    //esp_restart();
                     break;
             }
         }
@@ -237,7 +234,7 @@ void app_main(void)
                     break;
                 default:
                     ESP_LOGI(TAG, "ERROR: Event broke normal operation state machine :-)");
-                    esp_restart();
+                    //esp_restart();
                     break;
             }
         }

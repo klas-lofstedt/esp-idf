@@ -97,7 +97,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "Received on topic - %.*s, data - %.*s", event->topic_len, event->topic, event->data_len, event->data);
             parse_json_mqtt_message(event->data);
-            mqtt_publish_status();
+            //mqtt_publish_status();
             xEventGroupSetBits(app_event_group, APP_EVENT_MQTT_DATA_RECEIVED);
             break;
 

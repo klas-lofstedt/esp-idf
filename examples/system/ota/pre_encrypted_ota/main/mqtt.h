@@ -11,5 +11,7 @@
 //void mqtt_task(void *arg);
 void mqtt_init(void);
 void mqtt_publish_status(void);
+void mqtt_connect(void);
+void mqtt_disconnect(void);
 
 #endif /* _MQTT_H_ */

@@ -354,12 +354,12 @@ static int ble_event_handler(struct ble_gap_event *event, void *arg)
     case BLE_GAP_EVENT_ADV_COMPLETE:
         ESP_LOGI(TAG, "BLE GAP EVENT ADV COMPLETE");
         ble_start();
-        xEventGroupSetBits(app_event_group, APP_EVENT_BLE_GAP_ADV_COMPLETE);
+        //xEventGroupSetBits(app_event_group, APP_EVENT_BLE_GAP_ADV_COMPLETE);
         break;
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "BLE GAP EVENT DISCONNECT");
         ble_start();
-        xEventGroupSetBits(app_event_group, APP_EVENT_BLE_GAP_DISCONNECT);
+        //xEventGroupSetBits(app_event_group, APP_EVENT_BLE_GAP_DISCONNECTED);
         break;
     case BLE_GAP_EVENT_NOTIFY_TX:
         ESP_LOGI(TAG, "BLE_GAP_EVENT_NOTIFY_TX");

@@ -20,19 +20,19 @@ static const char *TAG = "APP";
 
 EventGroupHandle_t app_event_group;
 
-static uint32_t app_awaiting_event(void);
-static const char* app_event_string(app_events_t event);
+static app_events_t app_awaiting_event(app_events_t event_expected);
+static const char* app_event_string(app_events_t event_received);
 static const char* app_state_string(app_states_t state);
 
 //static void set_production_keys(void);
 //static void set_provisioning_keys(void);
 
-static uint32_t app_awaiting_event(void)
+static app_events_t app_awaiting_event(app_events_t event_expected)
 {
     EventBits_t bits = xEventGroupWaitBits(app_event_group,
         APP_EVENT_BLE_GAP_CONNECT |
         APP_EVENT_BLE_GAP_ADV_COMPLETE |
-        APP_EVENT_BLE_GAP_DISCONNECT |
+        APP_EVENT_BLE_GAP_DISCONNECTED |
         APP_EVENT_BLE_RECEIVE_POP_DONE |
         APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE |
         APP_EVENT_BLE_RECEIVE_WIFI_CREDS_FAIL |
@@ -45,37 +45,43 @@ static uint32_t app_awaiting_event(void)
         APP_EVENT_WIFI_CONNECTED |
         APP_EVENT_WIFI_SCAN_DONE |
         APP_EVENT_UNINITIALISED |
-        APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE,
-        //APP_EVENT_BLE_NOTIFY_DONE,
+        APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE |
+        APP_EVENT_MQTT_DATA_SENT |
+        APP_EVENT_MQTT_DATA_RECEIVED,
 
         pdTRUE, pdFALSE, portMAX_DELAY);
 
-    uint32_t event = (uint32_t)bits;
+    app_events_t event_received = (app_events_t)bits;
+    app_events_t event = event_received & event_expected;
+    ESP_LOGI(TAG, "EVENT RECEIVED: %s", app_event_string(event_received));
+    ESP_LOGI(TAG, "-> DO: %s", app_event_string(event));
 
     return event;
 }
 
-static const char* app_event_string(app_events_t event)
+static const char* app_event_string(app_events_t event_received)
 {
-    switch (event) {
-        case APP_EVENT_BLE_GAP_CONNECT: return "APP_EVENT_BLE_GAP_CONNECT";
-        case APP_EVENT_BLE_GAP_ADV_COMPLETE: return "APP_EVENT_BLE_GAP_ADV_COMPLETE";
-        case APP_EVENT_BLE_GAP_DISCONNECT: return "APP_EVENT_BLE_GAP_DISCONNECT";
-        case APP_EVENT_BLE_RECEIVE_POP_DONE: return "APP_EVENT_BLE_RECEIVE_POP_DONE";
-        case APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE: return "APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE";
-        case APP_EVENT_BLE_RECEIVE_WIFI_CREDS_FAIL: return "APP_EVENT_BLE_RECEIVE_WIFI_CREDS_FAIL";
-        case APP_EVENT_BLE_RECEIVE_CA_CERT_DONE: return "APP_EVENT_BLE_RECEIVE_CA_CERT_DONE";
-        case APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE: return "APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE";
-        case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE: return "APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE";
-        case APP_EVENT_BLE_NOTIFY_CA_CERT_DONE: return "APP_EVENT_BLE_NOTIFY_CA_CERT_DONE";
-        case APP_EVENT_WIFI_START: return "APP_EVENT_WIFI_START";
-        case APP_EVENT_WIFI_DISCONNECTED: return "APP_EVENT_WIFI_DISCONNECTED";
-        case APP_EVENT_WIFI_CONNECTED: return "APP_EVENT_WIFI_CONNECTED";
-        case APP_EVENT_WIFI_SCAN_DONE: return "APP_EVENT_WIFI_SCAN_DONE";
-        case APP_EVENT_UNINITIALISED: return "APP_EVENT_UNINITIALISED";
-        case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE: return "APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE";
-        default: return "UNKNOWN_APP_EVENT";
-    }
+    const char* event_text = "";
+    if (event_received & APP_EVENT_BLE_GAP_CONNECT) event_text = "APP_EVENT_BLE_GAP_CONNECT ";
+    if (event_received & APP_EVENT_BLE_GAP_ADV_COMPLETE) event_text = "APP_EVENT_BLE_GAP_ADV_COMPLETE ";
+    if (event_received & APP_EVENT_BLE_GAP_DISCONNECTED) event_text = "APP_EVENT_BLE_GAP_DISCONNECTED ";
+    if (event_received & APP_EVENT_BLE_RECEIVE_POP_DONE) event_text = "APP_EVENT_BLE_RECEIVE_POP_DONE ";
+    if (event_received & APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE) event_text = "APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE ";
+    if (event_received & APP_EVENT_BLE_RECEIVE_WIFI_CREDS_FAIL) event_text = "APP_EVENT_BLE_RECEIVE_WIFI_CREDS_FAIL ";
+    if (event_received & APP_EVENT_BLE_RECEIVE_CA_CERT_DONE) event_text = "APP_EVENT_BLE_RECEIVE_CA_CERT_DONE ";
+    if (event_received & APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE) event_text = "APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE ";
+    if (event_received & APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE) event_text = "APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE ";
+    if (event_received & APP_EVENT_BLE_NOTIFY_CA_CERT_DONE) event_text = "APP_EVENT_BLE_NOTIFY_CA_CERT_DONE ";
+    if (event_received & APP_EVENT_WIFI_START) event_text = "APP_EVENT_WIFI_START ";
+    if (event_received & APP_EVENT_WIFI_DISCONNECTED) event_text = "APP_EVENT_WIFI_DISCONNECTED ";
+    if (event_received & APP_EVENT_WIFI_CONNECTED) event_text = "APP_EVENT_WIFI_CONNECTED ";
+    if (event_received & APP_EVENT_WIFI_SCAN_DONE) event_text = "APP_EVENT_WIFI_SCAN_DONE ";
+    if (event_received & APP_EVENT_UNINITIALISED) event_text = "APP_EVENT_UNINITIALISED ";
+    if (event_received & APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE) event_text = "APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE ";
+    if (event_received & APP_EVENT_MQTT_DATA_SENT) event_text = "APP_EVENT_MQTT_DATA_SENT ";
+    if (event_received & APP_EVENT_MQTT_DATA_RECEIVED) event_text = "APP_EVENT_MQTT_DATA_RECEIVED ";
+
+    return event_text;
 }
 
 static const char* app_state_string(app_states_t state)
@@ -133,6 +139,7 @@ void app_main(void)
     aes_ctr_init();
     wifi_init();
     ble_init();
+    mqtt_init();
 
     if (!nvs_is_production_done()){
         app_state = APP_STATE_DO_PRODUCTION;
@@ -147,50 +154,51 @@ void app_main(void)
 
     while (true){
         ESP_LOGI(TAG, "Waiting for events...");
-
-        app_event_received = app_awaiting_event();
+        app_event_received = app_awaiting_event(app_event_expected);
 
         ESP_LOGI(TAG, "STATE: %s: 0x%lx", app_state_string(app_state), (uint32_t)app_state);
-        ESP_LOGI(TAG, "EVENT: %s: 0x%lx", app_event_string(app_event_received), (uint32_t)app_event_received);
 
         if (app_state == APP_STATE_DO_PRODUCTION){
 
         }
+
         if (app_state == APP_STATE_DO_PROVISION){
-            switch(app_event_received & app_event_expected){
+            switch(app_event_received){
                 case APP_EVENT_BLE_GAP_CONNECT:
-                    app_event_expected = APP_EVENT_BLE_RECEIVE_POP_DONE;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_BLE_RECEIVE_POP_DONE;
                     break;
                 case APP_EVENT_BLE_RECEIVE_POP_DONE:
-                    app_event_expected = APP_EVENT_WIFI_SCAN_DONE;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_SCAN_DONE;
                     wifi_start_scan();
                     break;
                 case APP_EVENT_WIFI_SCAN_DONE:
-                    app_event_expected = APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE;
                     ble_notify_wifi_scan();
                     break;
                 case APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE:
-                    app_event_expected = APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE;
                     break;
                 case APP_EVENT_BLE_RECEIVE_WIFI_CREDS_DONE:
-                    app_event_expected = APP_EVENT_WIFI_START;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_START;
                     wifi_reinit();
                     break;
                 case APP_EVENT_WIFI_START:
-                    app_event_expected = APP_EVENT_WIFI_CONNECTED | APP_EVENT_WIFI_DISCONNECTED;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_CONNECTED | APP_EVENT_WIFI_DISCONNECTED;
                     wifi_connect();
                     break;
                 case APP_EVENT_WIFI_CONNECTED:
-                    app_event_expected = APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE;
                     ble_notify_provisioning_status(true);
                     break;
                 case APP_EVENT_WIFI_DISCONNECTED:
-                    app_event_expected = APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE;
+                    //mqtt_disconnect();
                     ble_notify_provisioning_status(false);
                     break;
                 case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE:
                     app_state = APP_STATE_NORMAL_OPERATION;
-                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_DATA_SENT;
+                    esp_restart();
                     break;
                 case APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE:
                     app_state = APP_STATE_NORMAL_OPERATION;
@@ -198,31 +206,38 @@ void app_main(void)
                     wifi_connect();
                     break;
                 default:
-                    // TODO: print that event was not handled or reboot?
+                    ESP_LOGI(TAG, "ERROR: Event broke provision state machine :-)");
+                    esp_restart();
                     break;
             }
         }
         if (app_state == APP_STATE_NORMAL_OPERATION){
-            switch(app_event_received & app_event_expected){
+            switch(app_event_received){
                 case APP_EVENT_BLE_GAP_CONNECT:
                     app_state = APP_STATE_DO_PROVISION;
-                    app_event_expected = APP_EVENT_BLE_RECEIVE_POP_DONE;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_BLE_RECEIVE_POP_DONE;
                     break;
                 case APP_EVENT_WIFI_START:
                     app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_CONNECTED | APP_EVENT_WIFI_DISCONNECTED;
                     wifi_connect();
                     break;
                 case APP_EVENT_WIFI_CONNECTED:
-                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED;
-                    mqtt_init();
-                    //ota_update();
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_DATA_SENT | APP_EVENT_MQTT_DATA_RECEIVED;
                     break;
                 case APP_EVENT_WIFI_DISCONNECTED:
                     app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_CONNECTED | APP_EVENT_WIFI_DISCONNECTED;
                     wifi_connect();
                     break;
+                case APP_EVENT_MQTT_DATA_RECEIVED:
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_DATA_SENT | APP_EVENT_MQTT_DATA_RECEIVED;
+                    //switch_update()
+                    break;
+                case APP_EVENT_MQTT_DATA_SENT:
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_DATA_SENT | APP_EVENT_MQTT_DATA_RECEIVED;
+                    break;
                 default:
-                    // TODO: print that event was not handled or reboot?
+                    ESP_LOGI(TAG, "ERROR: Event broke normal operation state machine :-)");
+                    esp_restart();
                     break;
             }
         }

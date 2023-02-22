@@ -15,6 +15,7 @@
 #include "mqtt.h"
 #include "misc.h"
 #include "gpio.h"
+#include "app.h"
 
 
 #define PIN_LED 5
@@ -28,6 +29,7 @@ static const char *TAG = "MQTT";
 static char *create_json_mqtt_message(void);
 static void parse_json_mqtt_message(char *message_mqtt);
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
+static void mqtt_task(void *arg);
 
 extern const uint8_t ca_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 extern const uint8_t ca_cert_pem_end[] asm("_binary_ca_cert_pem_end");
@@ -44,6 +46,8 @@ typedef struct DeviceStatus {
 DeviceStatus device_status = { .status = false, .ping = true };
 
 esp_mqtt_client_handle_t mqtt_client = NULL;
+//static char* mqtt_sub_topic_buffer[128];
+static char* mqtt_sub_data_buffer[256];
 /*
  * @brief Event handler registered to receive MQTT events
  *
@@ -87,12 +91,14 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         case MQTT_EVENT_PUBLISHED:
             ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+            xEventGroupSetBits(app_event_group, APP_EVENT_MQTT_DATA_SENT);
             break;
 
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "Received on topic - %.*s, data - %.*s", event->topic_len, event->topic, event->data_len, event->data);
             parse_json_mqtt_message(event->data);
             mqtt_publish_status();
+            xEventGroupSetBits(app_event_group, APP_EVENT_MQTT_DATA_RECEIVED);
             break;
 
         case MQTT_EVENT_ERROR:
@@ -196,7 +202,8 @@ void mqtt_publish_status(void)
 
 void mqtt_init(void)
 {
-    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    //xTaskCreate(&mqtt_task, "mqtt_task", 8192, NULL, 5, NULL);
+
     esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
     esp_log_level_set("MQTT_CLIENT", ESP_LOG_VERBOSE);
@@ -220,4 +227,46 @@ void mqtt_init(void)
     mqtt_client = client;//assign to global client in case of publish
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
+}
+
+void mqtt_task(void *arg)
+{
+    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
+    esp_log_level_set("MQTT_CLIENT", ESP_LOG_VERBOSE);
+    esp_log_level_set("MQTT_EXAMPLE", ESP_LOG_VERBOSE);
+    esp_log_level_set("TRANSPORT_BASE", ESP_LOG_VERBOSE);
+    esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
+    esp_log_level_set("OUTBOX", ESP_LOG_VERBOSE);
+
+    const esp_mqtt_client_config_t mqtt_cfg = {
+        .broker.address.uri = "mqtts://a38deg5j7utjz-ats.iot.ap-southeast-2.amazonaws.com:8883",
+        .broker.verification.certificate = (const char *)ca_cert_pem_start,
+        .credentials = {
+            .authentication = {
+                .certificate = (const char *)client_cert_pem_start,
+                .key = (const char *)client_key_pem_start,
+            },
+        }
+    };
+
+    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
+    mqtt_client = client;//assign to global client in case of publish
+    esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+    esp_mqtt_client_start(client);
+
+    while(true){
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
+    }
+}
+
+void mqtt_connect(void)
+{
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    esp_mqtt_client_start(mqtt_client);
+}
+
+void mqtt_disconnect(void)
+{
+    esp_mqtt_client_stop(mqtt_client);
 }

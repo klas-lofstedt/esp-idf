@@ -5,6 +5,8 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "gpio.h"
+#include <stdbool.h>
+
 
 
 #define PIN_JIG_CONTROLLED_MAC  16

@@ -14,22 +14,18 @@
 // App
 #include "mqtt.h"
 #include "misc.h"
-#include "gpio.h"
 #include "app.h"
+#include "device.h"
 
-
-#define PIN_LED 5
-
-
-#define TOPIC_SUB_LEN (DEVICE_ID_LEN + 9)
-#define TOPIC_PUB_LEN (DEVICE_ID_LEN + 9)
+#define TOPIC_SUB_LEN       (DEVICE_ID_LEN + 9)
+#define TOPIC_PUB_LEN       (DEVICE_ID_LEN + 9)
+#define TOPIC_PUB_BASE      "esp32pub/"
+#define TOPIC_SUB_BASE      "esp32sub/"
+#define BROKER_ENDPOINT_URL "mqtts://a38deg5j7utjz-ats.iot.ap-southeast-2.amazonaws.com:8883"
 
 static const char *TAG = "MQTT";
 
-static char *create_json_mqtt_message(void);
-static void parse_json_mqtt_message(char *message_mqtt);
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
-static void mqtt_task(void *arg);
 
 extern const uint8_t ca_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 extern const uint8_t ca_cert_pem_end[] asm("_binary_ca_cert_pem_end");
@@ -38,16 +34,9 @@ extern const uint8_t client_cert_pem_end[] asm("_binary_aws_client_cert_pem_end"
 extern const uint8_t client_key_pem_start[] asm("_binary_aws_client_key_pem_start");
 extern const uint8_t client_key_pem_end[] asm("_binary_aws_client_key_pem_end");
 
-typedef struct DeviceStatus {
-    bool status;
-    bool ping;
-} DeviceStatus;
-
-DeviceStatus device_status = { .status = false, .ping = true };
-
 esp_mqtt_client_handle_t mqtt_client = NULL;
-//static char* mqtt_sub_topic_buffer[128];
-static char* mqtt_sub_data_buffer[256];
+
+static char mqtt_sub_data_buffer[256];
 /*
  * @brief Event handler registered to receive MQTT events
  *
@@ -67,7 +56,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     char device_id[DEVICE_ID_LEN];
     get_device_id(device_id);
     char topic_sub[TOPIC_SUB_LEN];
-    snprintf(topic_sub, TOPIC_SUB_LEN, "%s%s", "esp32sub/", device_id);
+    snprintf(topic_sub, TOPIC_SUB_LEN, "%s%s", TOPIC_SUB_BASE, device_id);
 
     switch ((esp_mqtt_event_id_t)event_id) {
         case MQTT_EVENT_CONNECTED:
@@ -81,8 +70,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         case MQTT_EVENT_SUBSCRIBED:
             ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            device_status.status = false;
-            mqtt_publish_status();
+            xEventGroupSetBits(app_event_group, APP_EVENT_MQTT_SUBSCRIBED);
             break;
 
         case MQTT_EVENT_UNSUBSCRIBED:
@@ -96,8 +84,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "Received on topic - %.*s, data - %.*s", event->topic_len, event->topic, event->data_len, event->data);
-            parse_json_mqtt_message(event->data);
-            //mqtt_publish_status();
+            if (event->data_len <= sizeof(mqtt_sub_data_buffer)){
+                memcpy(mqtt_sub_data_buffer, event->data, event->data_len);
+            } else {
+                ESP_LOGI(TAG, "Error: MQTT data too long for buffer");
+            }
             xEventGroupSetBits(app_event_group, APP_EVENT_MQTT_DATA_RECEIVED);
             break;
 
@@ -121,76 +112,18 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     }
 }
 
-void parse_json_mqtt_message(char *message_mqtt)
+const char* mqtt_data_received(void)
 {
-    cJSON *message_root = NULL;
-    message_root = cJSON_Parse(message_mqtt);
-    if(message_root == NULL){
-        ESP_LOGI(TAG, "MQTT subscription message parse fail");
-        return;
-    }
-
-    char *status = cJSON_GetObjectItem(message_root, "status") ->valuestring;
-    char *ping = cJSON_GetObjectItem(message_root, "ping") ->valuestring;
-    // Update global device struct
-    if (!strcmp(ping, "online")){
-        device_status.ping = true;
-    }
-    if (!strcmp(ping, "offline")){
-        device_status.ping = false;
-    }
-    if (!strcmp(status, "on")){
-        device_status.status = true;
-        gpio_toggle_led(true);
-    }
-    if (!strcmp(status, "off")){
-        device_status.status = false;
-        gpio_toggle_led(false);
-    }
-    cJSON_Delete(message_root);
-
-    ESP_LOGI(TAG, "MQTT Receive: status %d, ping %d", device_status.status, device_status.ping);
+    return mqtt_sub_data_buffer;
 }
 
-char *create_json_mqtt_message(void)
-{
-    char *json_str = NULL;
-
-    cJSON *message_root = cJSON_CreateObject();
-    cJSON *message_sub = cJSON_CreateObject();
-
-    char device_id[DEVICE_ID_LEN];
-    get_device_id(device_id);
-
-    cJSON_AddStringToObject(message_root, "id", device_id);
-    cJSON_AddStringToObject(message_root, "type", DEVICE_TYPE);
-    cJSON_AddStringToObject(message_sub, "ping", "online");
-    if (device_status.status){
-        cJSON_AddStringToObject(message_sub, "status", "on");
-    } else {
-        cJSON_AddStringToObject(message_sub, "status", "off");
-    }
-    cJSON_AddItemToObject(message_root, "settings", message_sub);
-
-
-    json_str = cJSON_Print(message_root);
-
-    cJSON_Delete(message_root);
-
-    ESP_LOGI(TAG, "Create JSON struct of size: %d, %s", strlen(json_str), json_str);
-
-    return json_str;
-}
-
-void mqtt_publish_status(void)
+void mqtt_data_send(const char *data)
 {
     // Publish MQTT message on subscribed
-    char *data = create_json_mqtt_message();
-
     char device_id[DEVICE_ID_LEN];
     get_device_id(device_id);
     char topic_pub[TOPIC_PUB_LEN];
-    snprintf(topic_pub, TOPIC_PUB_LEN, "%s%s", "esp32pub/", device_id);
+    snprintf(topic_pub, TOPIC_PUB_LEN, "%s%s", TOPIC_PUB_BASE, device_id);
 
     int msg_id = esp_mqtt_client_publish(mqtt_client, topic_pub, data, strlen(data), 0, 0);
     if (msg_id >= 0){
@@ -202,8 +135,6 @@ void mqtt_publish_status(void)
 
 void mqtt_init(void)
 {
-    //xTaskCreate(&mqtt_task, "mqtt_task", 8192, NULL, 5, NULL);
-
     esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
     esp_log_level_set("MQTT_CLIENT", ESP_LOG_VERBOSE);
@@ -213,7 +144,7 @@ void mqtt_init(void)
     esp_log_level_set("OUTBOX", ESP_LOG_VERBOSE);
 
     const esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = "mqtts://a38deg5j7utjz-ats.iot.ap-southeast-2.amazonaws.com:8883",
+        .broker.address.uri = BROKER_ENDPOINT_URL,
         .broker.verification.certificate = (const char *)ca_cert_pem_start,
         .credentials = {
             .authentication = {
@@ -227,46 +158,4 @@ void mqtt_init(void)
     mqtt_client = client;//assign to global client in case of publish
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
-}
-
-void mqtt_task(void *arg)
-{
-    esp_log_level_set("*", ESP_LOG_INFO);
-    esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
-    esp_log_level_set("MQTT_CLIENT", ESP_LOG_VERBOSE);
-    esp_log_level_set("MQTT_EXAMPLE", ESP_LOG_VERBOSE);
-    esp_log_level_set("TRANSPORT_BASE", ESP_LOG_VERBOSE);
-    esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
-    esp_log_level_set("OUTBOX", ESP_LOG_VERBOSE);
-
-    const esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = "mqtts://a38deg5j7utjz-ats.iot.ap-southeast-2.amazonaws.com:8883",
-        .broker.verification.certificate = (const char *)ca_cert_pem_start,
-        .credentials = {
-            .authentication = {
-                .certificate = (const char *)client_cert_pem_start,
-                .key = (const char *)client_key_pem_start,
-            },
-        }
-    };
-
-    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
-    mqtt_client = client;//assign to global client in case of publish
-    esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
-    esp_mqtt_client_start(client);
-
-    while(true){
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
-    }
-}
-
-void mqtt_connect(void)
-{
-    vTaskDelay(2000 / portTICK_PERIOD_MS);
-    esp_mqtt_client_start(mqtt_client);
-}
-
-void mqtt_disconnect(void)
-{
-    esp_mqtt_client_stop(mqtt_client);
 }

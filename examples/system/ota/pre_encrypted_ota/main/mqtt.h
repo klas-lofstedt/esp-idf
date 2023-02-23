@@ -10,8 +10,8 @@
 
 //void mqtt_task(void *arg);
 void mqtt_init(void);
-void mqtt_publish_status(void);
-void mqtt_connect(void);
-void mqtt_disconnect(void);
+void mqtt_data_send(const char *data);
+const char* mqtt_data_received(void);
+
 
 #endif /* _MQTT_H_ */

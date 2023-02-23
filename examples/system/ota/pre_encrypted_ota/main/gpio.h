@@ -8,6 +8,9 @@
 #ifndef _GPIO_H_
 #define _GPIO_H_
 
+#include <stdbool.h>
+
+
 void gpio_init(void);
 void gpio_toggle_led(bool status);
 

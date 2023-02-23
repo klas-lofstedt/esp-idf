@@ -14,6 +14,7 @@
 #include <cJSON.h>
 #include "gpio.h"
 #include "mqtt.h"
+#include "device.h"
 
 
 static const char *TAG = "APP";
@@ -47,7 +48,8 @@ static app_events_t app_awaiting_event(app_events_t event_expected)
         APP_EVENT_UNINITIALISED |
         APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE |
         APP_EVENT_MQTT_DATA_SENT |
-        APP_EVENT_MQTT_DATA_RECEIVED,
+        APP_EVENT_MQTT_DATA_RECEIVED |
+        APP_EVENT_MQTT_SUBSCRIBED,
 
         pdTRUE, pdFALSE, portMAX_DELAY);
 
@@ -80,6 +82,8 @@ static const char* app_event_string(app_events_t event_received)
     if (event_received & APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE) event_text = "APP_EVENT_BLE_NOTIFY_WIFI_CREDS_ERROR_DONE ";
     if (event_received & APP_EVENT_MQTT_DATA_SENT) event_text = "APP_EVENT_MQTT_DATA_SENT ";
     if (event_received & APP_EVENT_MQTT_DATA_RECEIVED) event_text = "APP_EVENT_MQTT_DATA_RECEIVED ";
+    if (event_received & APP_EVENT_MQTT_SUBSCRIBED) event_text = "APP_EVENT_MQTT_SUBSCRIBED ";
+
 
     return event_text;
 }
@@ -219,18 +223,23 @@ void app_main(void)
                     wifi_connect();
                     break;
                 case APP_EVENT_WIFI_CONNECTED:
-                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_DATA_SENT | APP_EVENT_MQTT_DATA_RECEIVED;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_SUBSCRIBED;
                     break;
                 case APP_EVENT_WIFI_DISCONNECTED:
                     app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_CONNECTED | APP_EVENT_WIFI_DISCONNECTED;
                     wifi_connect();
                     break;
                 case APP_EVENT_MQTT_DATA_RECEIVED:
-                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_DATA_SENT | APP_EVENT_MQTT_DATA_RECEIVED;
-                    //switch_update()
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_DATA_SENT | APP_EVENT_MQTT_DATA_RECEIVED | APP_EVENT_MQTT_SUBSCRIBED;
+                    device_set(mqtt_data_received());
+                    mqtt_data_send(device_get()); // Do this in order to update state on phone
                     break;
                 case APP_EVENT_MQTT_DATA_SENT:
-                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_DATA_SENT | APP_EVENT_MQTT_DATA_RECEIVED;
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_DATA_SENT | APP_EVENT_MQTT_DATA_RECEIVED | APP_EVENT_MQTT_SUBSCRIBED;
+                    break;
+                case APP_EVENT_MQTT_SUBSCRIBED:
+                    app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_DISCONNECTED | APP_EVENT_MQTT_DATA_SENT | APP_EVENT_MQTT_DATA_RECEIVED | APP_EVENT_MQTT_SUBSCRIBED;
+                    mqtt_data_send(device_get());
                     break;
                 default:
                     ESP_LOGI(TAG, "ERROR: Event broke normal operation state machine :-)");

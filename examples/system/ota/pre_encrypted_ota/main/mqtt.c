@@ -10,7 +10,6 @@
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include <sys/param.h>
-#include <cJSON.h>
 // App
 #include "mqtt.h"
 #include "misc.h"
@@ -117,7 +116,7 @@ const char* mqtt_data_received(void)
     return mqtt_sub_data_buffer;
 }
 
-void mqtt_data_send(const char *data)
+void mqtt_data_send(char *data)
 {
     // Publish MQTT message on subscribed
     char device_id[DEVICE_ID_LEN];
@@ -126,6 +125,9 @@ void mqtt_data_send(const char *data)
     snprintf(topic_pub, TOPIC_PUB_LEN, "%s%s", TOPIC_PUB_BASE, device_id);
 
     int msg_id = esp_mqtt_client_publish(mqtt_client, topic_pub, data, strlen(data), 0, 0);
+    if (data != NULL){
+        free(data);
+    }
     if (msg_id >= 0){
         ESP_LOGI(TAG, "Published msg_id: %d to %s", msg_id, topic_pub);
     } else {

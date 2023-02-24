@@ -10,7 +10,7 @@
 
 //void mqtt_task(void *arg);
 void mqtt_init(void);
-void mqtt_data_send(const char *data);
+void mqtt_data_send(char *data);
 const char* mqtt_data_received(void);
 
 

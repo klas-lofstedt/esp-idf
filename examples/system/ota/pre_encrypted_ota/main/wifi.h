@@ -12,8 +12,6 @@
 #define WIFI_PWD_MAX_LEN 64
 #define WIFI_MAX_SCAN_RESULTS 20 // TODO test with different sizes
 
-
-char* wifi_get_scan(void);
 bool wifi_start_scan(void);
 void wifi_stop_scan(void);
 void wifi_init(void);

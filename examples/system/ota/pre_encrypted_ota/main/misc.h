@@ -10,9 +10,6 @@
 
 #include <stdbool.h>
 
-#define DEVICE_TYPE ("SWITCH")
-#define DEVICE_ID_LEN 15
-
 void hex_string_from_u8_array(const uint8_t *in, char *out, size_t size);
 bool u8_array_from_hex_string(char *in, char *out, size_t size);
 void ascii_string_from_u8_array(const uint8_t *bytes, char *ascii_string, size_t len);

@@ -18,6 +18,7 @@
 #include "esp_wifi.h"
 #include "misc.h"
 #include "aes.h"
+#include "device.h"
 
 
 #define SERVICE_UUID                0xFFFF
@@ -52,6 +53,7 @@ bool handle_json_string(char *json_input)//, char *ssid, char *password)
     cJSON *root = cJSON_Parse(json_input);
     if (!root) {
         ESP_LOGI(TAG, "Error parsing JSON input");
+        cJSON_Delete(root);
         return false;
     }
 
@@ -194,6 +196,7 @@ bool ble_notify_wifi_scan(void)
 
         struct os_mbuf *om;
         om = ble_hs_mbuf_from_flat(json_str, strlen(json_str));
+        free(json_str);
         // TODO: come up with a better way to handle conn_handle
         conn_handle = 0;
         ESP_LOGI(TAG, "Notifying conn=%d", conn_handle);
@@ -202,7 +205,6 @@ bool ble_notify_wifi_scan(void)
             ESP_LOGE(TAG, "error notifying; rc=%d", rc);
             return false;
         }
-        cJSON_free(json_str);
     }
     xEventGroupSetBits(app_event_group, APP_EVENT_BLE_NOTIFY_WIFI_SCAN_DONE);
 
@@ -225,6 +227,7 @@ bool ble_notify_provisioning_status(bool status)
 
     struct os_mbuf *om;
     om = ble_hs_mbuf_from_flat(json_str, strlen(json_str));
+    free(json_str);
     // TODO: come up with a better way to handle conn_handle
     conn_handle = 0;
     ESP_LOGI(TAG, "Notifying conn=%d", conn_handle);
@@ -233,8 +236,6 @@ bool ble_notify_provisioning_status(bool status)
         ESP_LOGE(TAG, "error notifying; rc=%d", rc);
         return false;
     }
-    cJSON_free(json_str);
-
     if (status){
         xEventGroupSetBits(app_event_group, APP_EVENT_BLE_NOTIFY_WIFI_CREDS_OK_DONE);
     } else {
@@ -262,6 +263,7 @@ bool ble_notify_ca_cert(bool status)
 
     struct os_mbuf *om;
     om = ble_hs_mbuf_from_flat(json_str, strlen(json_str));
+    free(json_str);
     // TODO: come up with a better way to handle conn_handle
     conn_handle = 0;
     ESP_LOGI(TAG, "Notifying conn=%d", conn_handle);
@@ -270,7 +272,6 @@ bool ble_notify_ca_cert(bool status)
         ESP_LOGE(TAG, "error notifying; rc=%d", rc);
         return false;
     }
-    cJSON_free(json_str);
 
     xEventGroupSetBits(app_event_group, APP_EVENT_BLE_NOTIFY_CA_CERT_DONE);
 

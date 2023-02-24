@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include <stdlib.h>
 #include <string.h>
+#include "device.h"
 
 // FreeRTOS
 // ESP32

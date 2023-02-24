@@ -11,7 +11,6 @@
 #include "aes.h"
 #include <string.h>
 #include <stdio.h>
-#include <cJSON.h>
 #include "gpio.h"
 #include "mqtt.h"
 #include "device.h"
@@ -147,6 +146,7 @@ void app_main(void)
 
     if (!nvs_is_production_done()){
         app_state = APP_STATE_DO_PRODUCTION;
+        //nvs_set_device_type((int32_t)DEVICE_TYPE_SWITCH_V1);
         //app_event_expected = APP_EVENT_UART;
     }else if (!nvs_is_provision_done()){
         app_state = APP_STATE_DO_PROVISION;

@@ -23,8 +23,50 @@
 #define NVS_WIFI_PROVISION_KEY  "wifi_is_prov"
 #define NVS_BLE_POP_KEY         "ble_pop"
 #define NVS_AES_KEY             "aes_key"
+#define NVS_DEVICE_TYPE         "device_type"
 
 static const char *TAG = "NVS";
+
+bool nvs_set_device_type(uint32_t device_type)
+{
+    ESP_LOGI(TAG, "NVS device type: %ld", device_type);
+
+    // Create nvs handle
+    nvs_handle_t handle_device_type;
+    // Open nvs
+    ESP_ERROR_CHECK(nvs_open(NVS_APP_NAMESPACE, NVS_READWRITE, &handle_device_type));
+    // Create data to store
+    ESP_ERROR_CHECK(nvs_set_u32(handle_device_type, NVS_DEVICE_TYPE, device_type));
+    // Commit data to nvs
+    ESP_ERROR_CHECK(nvs_commit(handle_device_type));
+    // Read nvs back into char buffer
+    uint32_t is_device_type = 0;
+    ESP_ERROR_CHECK(nvs_get_u32(handle_device_type, NVS_DEVICE_TYPE, &is_device_type));
+
+    nvs_close(handle_device_type);
+
+    if (device_type == is_device_type){
+        ESP_LOGI(TAG, "NVS device type OK");
+        return true;
+    }
+    ESP_LOGI(TAG, "NVS device type failed");
+    return false;
+}
+
+uint32_t nvs_get_device_type(void)
+{
+    // Create nvs handle
+    nvs_handle_t handle_device_type;
+    // Open nvs
+    ESP_ERROR_CHECK(nvs_open(NVS_APP_NAMESPACE, NVS_READWRITE, &handle_device_type));
+    // We only erase the default production app (OTA won't have this for persistance)
+    uint32_t device_type = 0;
+    ESP_ERROR_CHECK(nvs_get_u32(handle_device_type, NVS_DEVICE_TYPE, &device_type));
+    // Close
+    nvs_close(handle_device_type);
+
+    return device_type;
+}
 
 void nvs_set_ble_pop(void)
 {

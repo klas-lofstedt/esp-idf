@@ -29,7 +29,7 @@ char *switch_get(void)
     get_device_id(device_id);
 
     cJSON_AddStringToObject(message_root, "id", device_id);
-    cJSON_AddStringToObject(message_root, "type", "SWITCH");//device_type_get_str(device_type));
+    cJSON_AddStringToObject(message_root, "type", "SWITCH");
     cJSON_AddStringToObject(message_sub, "ping", "online");
     if (switch_status.status){
         cJSON_AddStringToObject(message_sub, "status", "on");

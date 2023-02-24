@@ -126,7 +126,7 @@ void mqtt_data_send(char *data)
 
     int msg_id = esp_mqtt_client_publish(mqtt_client, topic_pub, data, strlen(data), 0, 0);
     if (data != NULL){
-        free(data);
+        free(data); // free as json_str is being allcocated in device_get (or xxxxx_get)
     }
     if (msg_id >= 0){
         ESP_LOGI(TAG, "Published msg_id: %d to %s", msg_id, topic_pub);

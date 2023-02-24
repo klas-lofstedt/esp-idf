@@ -219,7 +219,7 @@ bool nvs_wifi_set_pwd(const char* str)
 
 bool nvs_is_production_done(void)
 {
-    return true;
+    return false;
 }
 
 bool nvs_is_provision_done(void)

@@ -146,9 +146,12 @@ void app_main(void)
 
     if (!nvs_is_production_done()){
         app_state = APP_STATE_DO_PRODUCTION;
-        //nvs_set_device_type((int32_t)DEVICE_TYPE_SWITCH_V1);
+        nvs_set_device_type(DEVICE_TYPE_SWITCH);
         //app_event_expected = APP_EVENT_UART;
-    }else if (!nvs_is_provision_done()){
+
+        app_state = APP_STATE_NORMAL_OPERATION;
+        app_event_expected = APP_EVENT_BLE_GAP_CONNECT | APP_EVENT_WIFI_START;
+    } else if (!nvs_is_provision_done()){
         app_state = APP_STATE_DO_PROVISION;
         app_event_expected = APP_EVENT_BLE_GAP_CONNECT;
     } else {
